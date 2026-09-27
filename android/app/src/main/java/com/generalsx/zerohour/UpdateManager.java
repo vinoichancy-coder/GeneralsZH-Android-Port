@@ -69,6 +69,15 @@ final class UpdateManager {
 
     static final String[] ENGINE_LIBS = { "libmain.so", "libmain60.so" };
 
+    // GeneralsX @tweak Find N5 fork 28/09/2026 Engine updates are off in this fork. The
+    // manifest at BASE_URL is signed upstream and offers upstream's engine builds, which do
+    // not carry this fork's engine changes (Screen Shape, per-shape saved resolution); an
+    // installed one would replace the APK's engine and silently drop them. The signed
+    // settings (network servers, PC checksum) in the same manifest still apply: online play
+    // needs them current. Upstream engine fixes arrive here by merging upstream and building
+    // a new APK.
+    static final boolean ENGINE_UPDATES_ENABLED = false;
+
     private static final String PREFS = "gx_update";
     private static final String KEY_SERIAL = "serial";
     private static final String KEY_AUTO = "auto_check";
@@ -155,6 +164,9 @@ final class UpdateManager {
 
     /** The downloaded engine that is ready to run, or 0 if the APK's own engine should run. */
     static int activeEngineSeq(Context ctx) {
+        if (!ENGINE_UPDATES_ENABLED) {
+            return 0;
+        }
         int seq = readInt(activeEngineMarker(ctx));
         if (seq <= 0 || seq <= bundledEngineSeq(ctx) || seq == readInt(badEngineMarker(ctx))) {
             return 0;
@@ -275,7 +287,7 @@ final class UpdateManager {
             }
 
             JSONObject engine = manifest.optJSONObject("engine");
-            if (engine != null && withEngine) {
+            if (engine != null && withEngine && ENGINE_UPDATES_ENABLED) {
                 applyEngine(ctx, engine, r);
             }
 

@@ -75,6 +75,7 @@
 // USER INCLUDES (match WinMain.cpp pattern)
 #include "Lib/BaseType.h"
 #include "Common/CommandLine.h"
+#include "Common/GXScreenShape.h"
 #include "Common/CriticalSection.h"
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
@@ -1300,6 +1301,15 @@ int main(int argc, char* argv[])
 			// the engine's resolution-aware font scaling (GlobalLanguage).
 			int winW = 0, winH = 0;
 			SDL_GetWindowSizeInPixels(TheSDL3Window, &winW, &winH);
+			// GeneralsX @feature Find N5 fork 28/09/2026 Read the launcher's Screen Shape
+			// (-gxScreenShape) here, ahead of CommandLine, because the resolution below is
+			// chosen before GameMain(); see Common/GXScreenShape.h.
+			for (int i = 1; i + 1 < __argc; ++i) {
+				if (strcmp(__argv[i], "-gxScreenShape") == 0) {
+					GXScreenShape::set(__argv[i + 1]);
+					break;
+				}
+			}
 			if (!userSetRes && winW > 0 && winH > 0 && winW > winH) {
 				static char xresVal[16], yresVal[16];
 				static char xresFlag[] = "-xres";
@@ -1316,9 +1326,17 @@ int main(int argc, char* argv[])
 				// plain native-resolution rendering; only "Menu Text Size"
 				// (ResolutionFontAdjustment, in the Settings app) actually changes
 				// anything on screen.
+				// GeneralsX @feature Find N5 fork 28/09/2026 With a Screen Shape set, render
+				// at the largest rectangle of that shape inside the window; the pillarbox
+				// centres it. "Fill" (no argument) returns the window size unchanged.
 				int yres = winH;
 				int xres = winW;
+				GXScreenShape::fit(winW, winH, xres, yres);
 				xres &= ~1;  // keep it even
+				if (xres != winW || yres != winH) {
+					fprintf(stderr, "INFO: Screen Shape %s: rendering %dx%d inside window %dx%d\n",
+					        getenv(GXScreenShape::ENV_NAME), xres, yres, winW, winH);
+				}
 
 				// GeneralsX @bugfix Android port 09/04/2026 This block injects
 				// -xres/-yres as if the user passed them on the command line, and
@@ -1349,6 +1367,19 @@ int main(int argc, char* argv[])
 								int savedX = 0, savedY = 0;
 								if (sscanf(line, " Resolution = %d %d", &savedX, &savedY) == 2 &&
 								    savedX > 0 && savedY > 0) {
+									// GeneralsX @bugfix Find N5 fork 28/09/2026 A foldable has two
+									// screens of very different shapes (2616x1140 cover, 2480x2248
+									// inner) sharing one Options.ini. A Resolution picked on one of
+									// them was forced onto the other, pillarboxed into a strip.
+									// Keep a saved Resolution only when it has the shape this
+									// launch is rendering at; otherwise it belongs to the other
+									// screen (or to another Screen Shape) and the window-derived
+									// size above stands.
+									if (!GXScreenShape::sameShape(savedX, savedY, xres, yres)) {
+										fprintf(stderr, "INFO: ignoring saved Resolution %dx%d: shape differs from %dx%d (other screen or Screen Shape)\n",
+										        savedX, savedY, xres, yres);
+										break;
+									}
 									xres = savedX & ~1;
 									yres = savedY;
 									fprintf(stderr, "INFO: using saved Resolution %dx%d from Options.ini instead of window size %dx%d\n",

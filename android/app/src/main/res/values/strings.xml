@@ -56,6 +56,13 @@
     <string name="setup_sim_rate_60_desc">60 Hz matches the Windows GeneralsOnline client, which is what makes cross-play possible. It doubles the simulation work per second, so a slower device may run the game below full speed.</string>
     <string name="setup_sim_rate_help">The tick rate is fixed when the engine is built, so the app carries both versions and loads the one you pick here. The change takes effect the next time you start the game. Both players in a match must be on the same rate.</string>
     <string name="setup_toast_sim_rate_saved">Simulation rate saved. It will apply the next time you start the game.</string>
+    <string name="setup_card_screen_shape">Screen Shape</string>
+    <string name="setup_screen_shape_fill_short">Fill</string>
+    <string name="setup_screen_shape_16_9_short">16:9</string>
+    <string name="setup_screen_shape_4_3_short">4:3</string>
+    <string name="setup_screen_shape_desc">Fill uses the whole screen, and the interface stretches to its shape. 16:9 and 4:3 keep that shape with black bars: 4:3 is the shape the 2003 interface was drawn for, so buttons and panels keep their original proportions.</string>
+    <string name="setup_screen_shape_help">On a foldable the setting applies to whichever screen the game starts on. A resolution picked in the in-game Options is remembered only for the screen shape it was picked on. The change takes effect the next time you start the game.</string>
+    <string name="setup_toast_screen_shape_saved">Screen shape saved. It will apply the next time you start the game.</string>
     <string name="online_crossplay_hz_title">Simulation rate switched to 60 Hz</string>
     <string name="online_crossplay_hz_message">The Windows client simulates at 60 Hz, and a 30 Hz client cannot stay in step with it, so cross-play has switched this device to 60 Hz. It takes effect the next time you start the game.\n\nThis doubles the simulation work per second. If the game runs slowly, turn cross-play off or set the rate back to 30 Hz under Graphics — but then you can only play against other Android players on 30 Hz.</string>
     <string name="online_crossplay_hz_30">Simulation rate: 30 Hz — cannot hold sync with a PC</string>

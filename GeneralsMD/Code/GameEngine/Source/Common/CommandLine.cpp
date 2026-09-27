@@ -29,6 +29,7 @@
 #include "Common/CommandLine.h"
 #include "Common/GXReplayCheck.h"
 #include "Common/GXSafeArea.h"
+#include "Common/GXScreenShape.h"
 #include "Common/CRCDebug.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/Recorder.h"
@@ -452,6 +453,19 @@ Int parseGxSafeInsets(char *args[], int num)
 		float left = 0.0f, top = 0.0f, right = 0.0f, bottom = 0.0f;
 		if (sscanf(args[1], "%f,%f,%f,%f", &left, &top, &right, &bottom) == 4)
 			GXSafeArea::setFractions(left, top, right, bottom);
+		return 2;
+	}
+	return 1;
+}
+
+// GeneralsX @feature Find N5 fork 28/09/2026 Screen shape from the launcher; see
+// Common/GXScreenShape.h. SDL3Main has already read it to pick the resolution before
+// GameMain(); this keeps the value and its argument out of the unknown-parameter path.
+Int parseGxScreenShape(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXScreenShape::set(args[1]);
 		return 2;
 	}
 	return 1;
@@ -1207,6 +1221,7 @@ static CommandLineParam paramsForStartup[] =
 	{ "-gxAutoQuit", parseGxAutoQuit },
 	{ "-gxCrcEveryFrame", parseGxCrcEveryFrame },
 	{ "-gxSafeInsets", parseGxSafeInsets },
+	{ "-gxScreenShape", parseGxScreenShape },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded

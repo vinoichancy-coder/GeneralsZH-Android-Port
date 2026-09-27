@@ -39,6 +39,7 @@ import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.RoundedCorner;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.os.Bundle;
 import android.util.Log;
@@ -82,6 +83,13 @@ public class GeneralsZHActivity extends SDLActivity {
         if (safeInsets != null) {
             args.add("-gxSafeInsets");
             args.add(safeInsets);
+        }
+        // GeneralsX @feature Find N5 fork 28/09/2026 Screen Shape from Setup; "fill" passes
+        // nothing, which is the engine's unchanged behaviour (Common/GXScreenShape.h).
+        String screenShape = SetupActivity.getScreenShape(this);
+        if (!SetupActivity.SCREEN_SHAPE_FILL.equals(screenShape)) {
+            args.add("-gxScreenShape");
+            args.add(screenShape);
         }
         Intent intent = getIntent();
         String replay = intent != null ? intent.getStringExtra(EXTRA_REPLAY) : null;
@@ -305,6 +313,23 @@ public class GeneralsZHActivity extends SDLActivity {
         }
 
         super.onCreate(savedInstanceState);
+        applyPreferredRefreshRate();
+    }
+
+    // GeneralsX @tweak Find N5 fork 28/09/2026 The engine renders at most 60 frames a second
+    // (30 or 60, the simulation rate -- GameEngine.cpp caps the frame pacer to it), but
+    // nothing asked the display for a rate, so an LTPO panel was left for the OEM to drive,
+    // up to 120 Hz on the OPPO Find N5: twice the refreshes of the fastest frame this game
+    // produces, spent as heat on a phone that throttles under sustained load. 60 Hz divides
+    // both engine rates evenly, so frame pacing is unchanged. A preference, not a mode id:
+    // mode ids differ between a foldable's two screens, a refresh rate does not.
+    private static final float GAME_REFRESH_HZ = 60.0f;
+
+    private void applyPreferredRefreshRate() {
+        WindowManager.LayoutParams attrs = getWindow().getAttributes();
+        attrs.preferredRefreshRate = GAME_REFRESH_HZ;
+        getWindow().setAttributes(attrs);
+        Log.i(TAG, "requested a " + GAME_REFRESH_HZ + " Hz display refresh rate");
     }
 
     // GeneralsX @bugfix Android port 02/08/2026 A tester reported the camera

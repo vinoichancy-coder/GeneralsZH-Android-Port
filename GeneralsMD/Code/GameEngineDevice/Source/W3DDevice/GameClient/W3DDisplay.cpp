@@ -62,6 +62,7 @@ static void drawFramerateBar();
 #include "Common/PlayerList.h"
 #include "Common/ThingTemplate.h"
 #include "Common/GameLOD.h"
+#include "Common/GXScreenShape.h"
 #include "Common/DrawModule.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -634,6 +635,11 @@ static void buildFilteredResolutions()
 	float density = 1.0f;
 	DX8Wrapper::GetNativeDisplaySize(nativeW, nativeH, density);
 	if (nativeW <= 0 || nativeH <= 0) { nativeW = 1024; nativeH = 768; }
+	// GeneralsX @feature Find N5 fork 28/09/2026 With a Screen Shape set, the full-size
+	// entry is the largest rectangle of that shape, as SDL3Main chose at startup, so the
+	// list's first entry matches the running resolution and the 85/70/55 % steps below
+	// keep the shape instead of offering sizes SDL3Main would reject as "other screen".
+	GXScreenShape::fit(nativeW, nativeH, nativeW, nativeH);
 	s_filteredResolutions.push_back({ nativeW, nativeH, 32 });
 	// GeneralsX @bugfix Android port 08/31/2026 Users have asked for a manual
 	// way to trade resolution for FPS on weaker devices. Unlike the earlier

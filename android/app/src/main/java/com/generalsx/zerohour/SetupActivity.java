@@ -106,6 +106,36 @@ public class SetupActivity extends Activity {
             .putInt(PREF_SIM_HZ, hz == SIM_HZ_CROSSPLAY ? SIM_HZ_CROSSPLAY : SIM_HZ_RETAIL)
             .apply();
     }
+
+    // GeneralsX @feature Find N5 fork 28/09/2026 Screen Shape. The 2003 interface stretches
+    // to whatever shape the screen is: 1.72x too wide on a 21:9 foldable cover screen, 0.83x
+    // too narrow on its near-square inner screen. "4:3" and "16:9" make the game render at
+    // that shape with black bars (GeneralsZHActivity passes -gxScreenShape; the engine side
+    // is Common/GXScreenShape.h). "Fill" is the unchanged behaviour and the default.
+    static final String PREF_SCREEN_SHAPE = "screen_shape";
+    static final String SCREEN_SHAPE_FILL = "fill";
+    static final String SCREEN_SHAPE_16_9 = "16:9";
+    static final String SCREEN_SHAPE_4_3 = "4:3";
+    private static final String[] SCREEN_SHAPE_CHOICES = {
+        SCREEN_SHAPE_FILL, SCREEN_SHAPE_16_9, SCREEN_SHAPE_4_3
+    };
+
+    static String getScreenShape(android.content.Context ctx) {
+        String shape = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(PREF_SCREEN_SHAPE, SCREEN_SHAPE_FILL);
+        for (String choice : SCREEN_SHAPE_CHOICES) {
+            if (choice.equals(shape)) {
+                return choice;
+            }
+        }
+        return SCREEN_SHAPE_FILL;
+    }
+
+    static void setScreenShape(android.content.Context ctx, String shape) {
+        ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putString(PREF_SCREEN_SHAPE, shape)
+            .apply();
+    }
     // GeneralsX @feature Android port 06/09/2026 Optional folder holding the
     // BASE Generals archives, for copies that keep them somewhere the engine
     // will not find on its own.
@@ -367,6 +397,7 @@ public class SetupActivity extends Activity {
         switch (tab) {
             case TAB_GRAPHICS:
                 buildSimRateSection(page);
+                buildScreenShapeSection(page);
                 buildRenderBackendSection(page);
                 // Custom Vulkan driver / dxvk.conf only matter when Vulkan is
                 // the selected backend -- the GLES/GLES+ANGLE paths never
@@ -1150,6 +1181,50 @@ public class SetupActivity extends Activity {
             ? R.string.setup_sim_rate_60_desc
             : R.string.setup_sim_rate_30_desc));
         UiKit.helpText(content, getString(R.string.setup_sim_rate_help));
+    }
+
+    private String screenShapeLabel(String shape) {
+        switch (shape) {
+            case SCREEN_SHAPE_16_9:
+                return getString(R.string.setup_screen_shape_16_9_short);
+            case SCREEN_SHAPE_4_3:
+                return getString(R.string.setup_screen_shape_4_3_short);
+            default:
+                return getString(R.string.setup_screen_shape_fill_short);
+        }
+    }
+
+    // GeneralsX @feature Find N5 fork 28/09/2026 Three fixed, mutually exclusive choices, so
+    // the same segmented row as Simulation Rate above: the current one is visible without a
+    // tap, and switching is one.
+    private void buildScreenShapeSection(LinearLayout root) {
+        LinearLayout content = UiKit.card(root);
+        TextView status = UiKit.sectionHeader(content, R.drawable.ic_gzh_display,
+            getString(R.string.setup_card_screen_shape), true);
+
+        final String current = getScreenShape(this);
+        status.setText(screenShapeLabel(current));
+
+        CharSequence[] labels = new CharSequence[SCREEN_SHAPE_CHOICES.length];
+        int selected = 0;
+        for (int i = 0; i < SCREEN_SHAPE_CHOICES.length; i++) {
+            labels[i] = screenShapeLabel(SCREEN_SHAPE_CHOICES[i]);
+            if (SCREEN_SHAPE_CHOICES[i].equals(current)) {
+                selected = i;
+            }
+        }
+        UiKit.segmented(content, labels, selected, index -> {
+            String picked = SCREEN_SHAPE_CHOICES[index];
+            if (picked.equals(getScreenShape(this))) {
+                return;
+            }
+            setScreenShape(this, picked);
+            status.setText(screenShapeLabel(picked));
+            Toast.makeText(this, R.string.setup_toast_screen_shape_saved, Toast.LENGTH_LONG).show();
+        });
+
+        UiKit.supporting(content, getString(R.string.setup_screen_shape_desc));
+        UiKit.helpText(content, getString(R.string.setup_screen_shape_help));
     }
 
     private void buildRenderBackendSection(LinearLayout root) {
