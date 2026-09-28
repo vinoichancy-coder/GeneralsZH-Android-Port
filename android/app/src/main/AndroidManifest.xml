@@ -76,9 +76,12 @@
          with READ_EXTERNAL_STORAGE granted, File.listFiles() cannot see the game's .big files in
          shared storage. The flag only has an effect on Android 10; Android 11+ ignores it and
          uses MANAGE_EXTERNAL_STORAGE ("All files access") as before. -->
+    <!-- GeneralsX @feature Find N5 fork 28/09/2026 roundIcon names the same adaptive icon, so
+         launchers that ask for a round icon get the new art rather than a generated fallback. -->
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:isGame="true"
         android:appCategory="game"

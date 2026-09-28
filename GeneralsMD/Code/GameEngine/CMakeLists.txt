@@ -94,6 +94,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/RandomValue.h
     Include/Common/GXReplayCheck.h
     Include/Common/GXSafeArea.h
+    Include/Common/GXTouchSettings.h
     Include/Common/StatsExporter.h
     Include/Common/Recorder.h
 #    Include/Common/ReplaySimulation.h
@@ -610,6 +611,7 @@ set(GAMEENGINE_SRC
 #    Source/Common/RandomValue.cpp
     Source/Common/GXReplayCheck.cpp
     Source/Common/GXSafeArea.cpp
+    Source/Common/GXTouchSettings.cpp
     Source/Common/StatsExporter.cpp
     Source/Common/Recorder.cpp
 #    Source/Common/ReplaySimulation.cpp

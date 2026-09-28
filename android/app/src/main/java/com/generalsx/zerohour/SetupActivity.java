@@ -48,11 +48,13 @@ import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
 import android.text.style.UnderlineSpan;
 import android.view.ContextThemeWrapper;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -136,6 +138,95 @@ public class SetupActivity extends Activity {
             .putString(PREF_SCREEN_SHAPE, shape)
             .apply();
     }
+
+    // GeneralsX @feature Find N5 fork 28/09/2026 Touch controls. Chosen here, applied by the
+    // engine: GeneralsZHActivity.getArguments() passes every one of these on each launch
+    // (-gxLongPressMs, -gxDoubleTapDrag, -gxSmartTap, -gxCancelButton, -gxCancelButtonSize),
+    // so the defaults below are also what a player who never opens this page gets.
+    static final String PREF_TOUCH_LONG_PRESS_MS = "touch_long_press_ms";
+    static final String PREF_TOUCH_DOUBLE_TAP_DRAG = "touch_double_tap_drag";
+    static final String PREF_TOUCH_SMART_TAP_DELAY = "touch_smart_tap_delay";
+    static final String PREF_TOUCH_CANCEL_BUTTON = "touch_cancel_button";
+    static final String PREF_TOUCH_CANCEL_BUTTON_SIZE = "touch_cancel_button_size";
+
+    static final int TOUCH_LONG_PRESS_DEFAULT_MS = 600;
+    static final int TOUCH_LONG_PRESS_MIN_MS = 300;
+    static final int TOUCH_LONG_PRESS_MAX_MS = 2000;
+    static final int TOUCH_LONG_PRESS_STEP_MS = 100;
+
+    static final int TOUCH_CANCEL_BUTTON_SMALL = 1;
+    static final int TOUCH_CANCEL_BUTTON_MEDIUM = 2;
+    static final int TOUCH_CANCEL_BUTTON_LARGE = 3;
+
+    /** Clamped to 300..2000 ms and rounded to the 100 ms step the slider offers. */
+    static int getTouchLongPressMs(android.content.Context ctx) {
+        int ms = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getInt(PREF_TOUCH_LONG_PRESS_MS, TOUCH_LONG_PRESS_DEFAULT_MS);
+        return clampLongPressMs(ms);
+    }
+
+    static void setTouchLongPressMs(android.content.Context ctx, int ms) {
+        ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putInt(PREF_TOUCH_LONG_PRESS_MS, clampLongPressMs(ms))
+            .apply();
+    }
+
+    private static int clampLongPressMs(int ms) {
+        int clamped = Math.max(TOUCH_LONG_PRESS_MIN_MS, Math.min(TOUCH_LONG_PRESS_MAX_MS, ms));
+        return Math.round(clamped / (float) TOUCH_LONG_PRESS_STEP_MS) * TOUCH_LONG_PRESS_STEP_MS;
+    }
+
+    static boolean getTouchDoubleTapDrag(android.content.Context ctx) {
+        return getTouchFlag(ctx, PREF_TOUCH_DOUBLE_TAP_DRAG);
+    }
+
+    static void setTouchDoubleTapDrag(android.content.Context ctx, boolean enabled) {
+        setTouchFlag(ctx, PREF_TOUCH_DOUBLE_TAP_DRAG, enabled);
+    }
+
+    static boolean getTouchSmartTapDelay(android.content.Context ctx) {
+        return getTouchFlag(ctx, PREF_TOUCH_SMART_TAP_DELAY);
+    }
+
+    static void setTouchSmartTapDelay(android.content.Context ctx, boolean enabled) {
+        setTouchFlag(ctx, PREF_TOUCH_SMART_TAP_DELAY, enabled);
+    }
+
+    static boolean getTouchCancelButton(android.content.Context ctx) {
+        return getTouchFlag(ctx, PREF_TOUCH_CANCEL_BUTTON);
+    }
+
+    static void setTouchCancelButton(android.content.Context ctx, boolean enabled) {
+        setTouchFlag(ctx, PREF_TOUCH_CANCEL_BUTTON, enabled);
+    }
+
+    /** 1 = small, 2 = medium (default), 3 = large. */
+    static int getTouchCancelButtonSize(android.content.Context ctx) {
+        int size = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getInt(PREF_TOUCH_CANCEL_BUTTON_SIZE, TOUCH_CANCEL_BUTTON_MEDIUM);
+        return size >= TOUCH_CANCEL_BUTTON_SMALL && size <= TOUCH_CANCEL_BUTTON_LARGE
+            ? size : TOUCH_CANCEL_BUTTON_MEDIUM;
+    }
+
+    static void setTouchCancelButtonSize(android.content.Context ctx, int size) {
+        int stored = size >= TOUCH_CANCEL_BUTTON_SMALL && size <= TOUCH_CANCEL_BUTTON_LARGE
+            ? size : TOUCH_CANCEL_BUTTON_MEDIUM;
+        ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putInt(PREF_TOUCH_CANCEL_BUTTON_SIZE, stored)
+            .apply();
+    }
+
+    // Every touch switch defaults to on.
+    private static boolean getTouchFlag(android.content.Context ctx, String key) {
+        return ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(key, true);
+    }
+
+    private static void setTouchFlag(android.content.Context ctx, String key, boolean enabled) {
+        ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putBoolean(key, enabled)
+            .apply();
+    }
+
     // GeneralsX @feature Android port 06/09/2026 Optional folder holding the
     // BASE Generals archives, for copies that keep them somewhere the engine
     // will not find on its own.
@@ -178,8 +269,11 @@ public class SetupActivity extends Activity {
         // language picker performs, so changing the launcher language leaves
         // you looking at the section you changed it from rather than being
         // dropped back on Home.
+        // GeneralsX @feature Find N5 fork 28/09/2026 Now a page id (Home, Settings or one of
+        // its sub-pages). An id this build does not know -- the old five-tab values included
+        // -- opens Home.
         if (savedInstanceState != null) {
-            currentTab = savedInstanceState.getInt(STATE_TAB, TAB_HOME);
+            currentPage = sanitizePage(savedInstanceState.getInt(STATE_TAB, PAGE_HOME));
         }
 
         // GeneralsX @bugfix Android port 08/07/2026 This screen is the ONLY
@@ -197,7 +291,7 @@ public class SetupActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putInt(STATE_TAB, currentTab);
+        outState.putInt(STATE_TAB, currentPage);
     }
 
     // GeneralsX @bugfix Android port launcher-ui-2026 08/09/2026 The fallback
@@ -207,10 +301,11 @@ public class SetupActivity extends Activity {
     // was reached. Plain framework widgets only, from here down.
     private void buildFallbackUi(Throwable failure) {
         clearPageReferences();
-        // No tabs in the fallback: showTab() must become a no-op if anything
+        // No pages in the fallback: showPage() must become a no-op if anything
         // still calls it (onActivityResult does).
         contentHost = null;
-        appBarTitle = null;
+        appBarHost = null;
+        bottomNav = null;
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -260,6 +355,7 @@ public class SetupActivity extends Activity {
         // re-applies the landscape lock itself the next time it's needed.
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         refreshStatus();
+        refreshHomeStatus();
         refreshGeneralsOnlineStatus();
         loadDxvkConfigIntoEditor();
         refreshDiagnosticsSwitches();
@@ -275,23 +371,80 @@ public class SetupActivity extends Activity {
     // was one endless scroll: eleven stacked cards, every one of them visible
     // whether or not it had anything to do with what you came here for, and
     // the two controls people actually open this app for (pick a folder,
-    // launch) sat in the middle of it. It is now five sections behind a
-    // Material 3 bottom navigation bar -- Home, Graphics, Interface, Tools,
-    // Help -- each a short page you can take in at a glance.
+    // launch) sat in the middle of it.
     //
-    // Nothing was dropped in the process: every card, button, switch, slider
-    // and status line that existed before still exists, and every string
-    // resource is still used. See showTab() for where each one landed.
+    // GeneralsX @feature Find N5 fork 28/09/2026 Two destinations behind the Material 3
+    // bottom navigation bar instead of five tabs: Home (the emblem, Play, and three status
+    // rows that say whether pressing Play will work) and Settings (a list of categories,
+    // each opening its own page with a back arrow). The categories say what is inside
+    // before they are opened, which five tab names could not.
+    //
+    // Nothing was dropped in the process: every section builder is still called, from the
+    // page showPage() lists it under, and every refresh* method still runs against whatever
+    // the current page built.
     private static final String STATE_TAB = "gzh_tab";
-    private static final int TAB_HOME = 1;
-    private static final int TAB_GRAPHICS = 2;
-    private static final int TAB_INTERFACE = 3;
-    private static final int TAB_TOOLS = 4;
-    private static final int TAB_HELP = 5;
+    private static final int PAGE_HOME = 1;
+    private static final int PAGE_SETTINGS = 10;
+    private static final int PAGE_GAME = 11;
+    private static final int PAGE_TOUCH = 12;
+    private static final int PAGE_DISPLAY = 13;
+    private static final int PAGE_FILES = 14;
+    private static final int PAGE_ONLINE = 15;
+    private static final int PAGE_UPDATES = 16;
+    private static final int PAGE_ADVANCED = 17;
+    private static final int PAGE_ABOUT = 18;
 
-    private int currentTab = TAB_HOME;
+    // Bottom navigation item ids: the two top-level pages themselves.
+    private static final int NAV_HOME = PAGE_HOME;
+    private static final int NAV_SETTINGS = PAGE_SETTINGS;
+
+    // The Settings list, top to bottom. The same index in all four arrays.
+    private static final int[] SETTINGS_PAGES = {
+        PAGE_GAME, PAGE_TOUCH, PAGE_DISPLAY, PAGE_FILES,
+        PAGE_ONLINE, PAGE_UPDATES, PAGE_ADVANCED, PAGE_ABOUT
+    };
+    private static final int[] SETTINGS_TITLES = {
+        R.string.settings_cat_game, R.string.settings_cat_touch,
+        R.string.settings_cat_display, R.string.settings_cat_files,
+        R.string.settings_cat_online, R.string.settings_cat_updates,
+        R.string.settings_cat_advanced, R.string.settings_cat_about
+    };
+    private static final int[] SETTINGS_DESCRIPTIONS = {
+        R.string.settings_cat_game_desc, R.string.settings_cat_touch_desc,
+        R.string.settings_cat_display_desc, R.string.settings_cat_files_desc,
+        R.string.settings_cat_online_desc, R.string.settings_cat_updates_desc,
+        R.string.settings_cat_advanced_desc, R.string.settings_cat_about_desc
+    };
+    private static final int[] SETTINGS_ICONS = {
+        R.drawable.ic_gzh_chip, R.drawable.ic_gzh_touch,
+        R.drawable.ic_gzh_globe, R.drawable.ic_gzh_folder,
+        R.drawable.ic_gzh_account, R.drawable.ic_gzh_refresh,
+        R.drawable.ic_gzh_wrench, R.drawable.ic_gzh_info
+    };
+
+    private int currentPage = PAGE_HOME;
     private FrameLayout contentHost;
-    private TextView appBarTitle;
+    private LinearLayout appBarHost;
+    private BottomNavigationView bottomNav;
+    // Set while the bar's selection is moved in code, so that move does not rebuild the page.
+    private boolean syncingBottomNav;
+
+    /** Position of a settings sub-page in SETTINGS_PAGES, or -1 for Home and the Settings list. */
+    private static int settingsIndex(int page) {
+        for (int i = 0; i < SETTINGS_PAGES.length; i++) {
+            if (SETTINGS_PAGES[i] == page) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static int sanitizePage(int page) {
+        if (page == PAGE_HOME || page == PAGE_SETTINGS || settingsIndex(page) >= 0) {
+            return page;
+        }
+        return PAGE_HOME;
+    }
 
     private void buildUi() {
         clearPageReferences();
@@ -305,20 +458,21 @@ public class SetupActivity extends Activity {
         // navigation bar below clears the gesture handle.
         InsetUtil.applySafeInsets(shell);
 
-        appBarTitle = UiKit.appBar(shell, getString(R.string.setup_title),
-            getString(R.string.nav_tab_home),
-            R.drawable.ic_gzh_doc, getString(R.string.setup_button_view_logs), this::onViewLogs);
+        // Rebuilt by every page: a sub-page carries a back arrow and its own title.
+        appBarHost = new LinearLayout(this);
+        appBarHost.setOrientation(LinearLayout.VERTICAL);
+        shell.addView(appBarHost, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         contentHost = new FrameLayout(this);
         shell.addView(contentHost, new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        shell.addView(buildBottomNav(), new LinearLayout.LayoutParams(
+        bottomNav = buildBottomNav();
+        shell.addView(bottomNav, new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        if (contentHost.getChildCount() == 0) {
-            showTab(currentTab);
-        }
+        navigateTo(currentPage);
     }
 
     private BottomNavigationView buildBottomNav() {
@@ -327,7 +481,7 @@ public class SetupActivity extends Activity {
         // Keep the tab order left-to-right in every language, Arabic and Farsi
         // included. Android mirrors layouts in RTL locales, which is correct for
         // the content -- and the rest of this launcher is built on start/end so
-        // it mirrors properly -- but it also reversed the five tabs, putting Home
+        // it mirrors properly -- but it also reversed the tabs, putting Home
         // on the right, and that was reported as wrong. The tabs are a fixed rail
         // of destinations rather than a line of reading, so pin the bar itself to
         // LTR and leave text direction on the locale, so the labels still shape
@@ -351,27 +505,60 @@ public class SetupActivity extends Activity {
         nav.setItemRippleColor(UiKit.tint(this, R.color.gzh_ripple_primary));
 
         Menu menu = nav.getMenu();
-        menu.add(Menu.NONE, TAB_HOME, 0, R.string.nav_tab_home).setIcon(R.drawable.ic_gzh_home);
-        menu.add(Menu.NONE, TAB_GRAPHICS, 1, R.string.nav_tab_graphics).setIcon(R.drawable.ic_gzh_display);
-        menu.add(Menu.NONE, TAB_INTERFACE, 2, R.string.nav_tab_interface).setIcon(R.drawable.ic_gzh_globe);
-        menu.add(Menu.NONE, TAB_TOOLS, 3, R.string.nav_tab_tools).setIcon(R.drawable.ic_gzh_wrench);
-        menu.add(Menu.NONE, TAB_HELP, 4, R.string.nav_tab_help).setIcon(R.drawable.ic_gzh_info);
+        menu.add(Menu.NONE, NAV_HOME, 0, R.string.nav_tab_home).setIcon(R.drawable.ic_gzh_home);
+        menu.add(Menu.NONE, NAV_SETTINGS, 1, R.string.nav_settings).setIcon(R.drawable.ic_gzh_sliders);
 
         nav.setOnItemSelectedListener(item -> {
-            showTab(item.getItemId());
+            if (!syncingBottomNav) {
+                showPage(item.getItemId() == NAV_SETTINGS ? PAGE_SETTINGS : PAGE_HOME);
+            }
             return true;
         });
-        nav.setSelectedItemId(currentTab);
+        // Tapping Settings while inside one of its sub-pages goes back up to the list.
+        nav.setOnItemReselectedListener(item -> {
+            if (item.getItemId() == NAV_SETTINGS && currentPage != PAGE_SETTINGS) {
+                showPage(PAGE_SETTINGS);
+            }
+        });
         return nav;
     }
 
-    private int tabTitle(int tab) {
-        switch (tab) {
-            case TAB_GRAPHICS:  return R.string.nav_tab_graphics;
-            case TAB_INTERFACE: return R.string.nav_tab_interface;
-            case TAB_TOOLS:     return R.string.nav_tab_tools;
-            case TAB_HELP:      return R.string.nav_tab_help;
-            default:            return R.string.nav_tab_home;
+    /** Shows {@code page} and moves the bottom bar's selection to match it. */
+    private void navigateTo(int page) {
+        showPage(page);
+        syncBottomNav();
+    }
+
+    private void syncBottomNav() {
+        if (bottomNav == null) {
+            return;
+        }
+        int wanted = currentPage == PAGE_HOME ? NAV_HOME : NAV_SETTINGS;
+        if (bottomNav.getSelectedItemId() != wanted) {
+            syncingBottomNav = true;
+            try {
+                bottomNav.setSelectedItemId(wanted);
+            } finally {
+                syncingBottomNav = false;
+            }
+        }
+    }
+
+    private void buildAppBar() {
+        if (appBarHost == null) {
+            return;
+        }
+        appBarHost.removeAllViews();
+        int index = settingsIndex(currentPage);
+        if (index >= 0) {
+            UiKit.appBar(appBarHost, R.drawable.ic_gzh_back, getString(R.string.settings_back),
+                () -> navigateTo(PAGE_SETTINGS),
+                getString(R.string.nav_settings), getString(SETTINGS_TITLES[index]),
+                0, null, null);
+        } else {
+            UiKit.appBar(appBarHost, getString(R.string.setup_title),
+                getString(currentPage == PAGE_SETTINGS ? R.string.nav_settings : R.string.nav_tab_home),
+                0, null, null);
         }
     }
 
@@ -382,60 +569,91 @@ public class SetupActivity extends Activity {
      * all null-check, so a page that has no status line simply doesn't get one
      * updated.
      */
-    private void showTab(int tab) {
-        currentTab = tab;
+    private void showPage(int page) {
+        currentPage = sanitizePage(page);
         if (contentHost == null) {
-            return;  // the plain-widget fallback UI is up; there are no tabs
+            return;  // the plain-widget fallback UI is up; there are no pages
         }
         clearPageReferences();
         contentHost.removeAllViews();
-        if (appBarTitle != null) {
-            appBarTitle.setText(tabTitle(tab));
-        }
+        buildAppBar();
 
-        LinearLayout page = UiKit.scrollingPage(contentHost);
-        switch (tab) {
-            case TAB_GRAPHICS:
-                buildSimRateSection(page);
-                buildScreenShapeSection(page);
-                buildRenderBackendSection(page);
+        LinearLayout content = UiKit.scrollingPage(contentHost);
+        switch (currentPage) {
+            case PAGE_SETTINGS:
+                buildSettingsList(content);
+                break;
+            case PAGE_GAME:
+                buildSimRateSection(content);
+                buildScreenShapeSection(content);
+                buildRenderBackendSection(content);
+                break;
+            case PAGE_TOUCH:
+                buildTouchControlsSection(content);
+                break;
+            case PAGE_DISPLAY:
+                buildLanguageSection(content);
+                buildUiScaleSection(content);
+                break;
+            case PAGE_FILES:
+                buildGameFilesSection(content);
+                break;
+            case PAGE_ONLINE:
+                buildGeneralsOnlineSection(content);
+                break;
+            case PAGE_UPDATES:
+                buildUpdatesSection(content);
+                break;
+            case PAGE_ADVANCED:
                 // Custom Vulkan driver / dxvk.conf only matter when Vulkan is
                 // the selected backend -- the GLES/GLES+ANGLE paths never
                 // touch DXVK at all, see
                 // Core/Libraries/Source/d3d8gles/CMakeLists.txt.
                 if (RENDER_BACKEND_VULKAN.equals(getRenderBackendChoice())) {
                     applyRecommendedDriverIfNeeded();
-                    buildCustomDriverSection(page);
-                    buildDxvkConfigSection(page);
+                    buildCustomDriverSection(content);
+                    buildDxvkConfigSection(content);
                 }
+                buildLogsSection(content);
+                buildDiagnosticsSection(content);
                 break;
-            case TAB_INTERFACE:
-                buildLanguageSection(page);
-                buildUiScaleSection(page);
+            case PAGE_ABOUT:
+                buildHelpSection(content);
                 break;
-            case TAB_TOOLS:
-                buildLogsSection(page);
-                buildDiagnosticsSection(page);
-                break;
-            case TAB_HELP:
-                buildHelpSection(page);
-                break;
-            case TAB_HOME:
+            case PAGE_HOME:
             default:
-                buildHomeSection(page);
+                buildHomePage(content);
                 break;
         }
 
         refreshStatus();
+        refreshHomeStatus();
         refreshGeneralsOnlineStatus();
         loadDxvkConfigIntoEditor();
         refreshDiagnosticsSwitches();
         refreshUpdatesStatus();
     }
 
+    // GeneralsX @feature Find N5 fork 28/09/2026 Back walks up the page tree -- a settings
+    // sub-page to the Settings list, the list to Home -- and only leaves the app from Home.
+    // onBackPressed() rather than an OnBackInvokedCallback: this Activity is a plain
+    // framework Activity, and without the manifest's enableOnBackInvokedCallback opt-in
+    // (targetSdk 35) the system still routes Back here.
+    @Override
+    public void onBackPressed() {
+        if (contentHost != null && currentPage != PAGE_HOME) {
+            navigateTo(settingsIndex(currentPage) >= 0 ? PAGE_SETTINGS : PAGE_HOME);
+            return;
+        }
+        super.onBackPressed();
+    }
+
     /** Forgets every page-scoped view so a stale one is never written to. */
     private void clearPageReferences() {
         statusText = null;
+        homeFilesRow = null;
+        homeOnlineRow = null;
+        homeConfigRow = null;
         onlineStatusView = null;
         updatesStatusView = null;
         gameLanguageStatusView = null;
@@ -450,11 +668,130 @@ public class SetupActivity extends Activity {
 
     // ------------------------------------------------------------ Home page
 
-    private void buildHomeSection(LinearLayout page) {
-        // The one thing this app exists to do, as the first thing on it.
-        UiKit.button(page, UiKit.BTN_PRIMARY, R.drawable.ic_gzh_play,
-            getString(R.string.setup_button_launch_game), this::onLaunchGame);
+    // GeneralsX @feature Find N5 fork 28/09/2026 Home is calm on purpose: what this is, the
+    // one button the app exists for, and three rows that say whether pressing it will work.
+    // Each row opens the place where its answer is changed.
+    private UiKit.Row homeFilesRow;
+    private UiKit.Row homeOnlineRow;
+    private UiKit.Row homeConfigRow;
 
+    private void buildHomePage(LinearLayout page) {
+        LinearLayout hero = UiKit.card(page);
+        hero.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        ImageView emblem = new ImageView(this);
+        emblem.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.ic_gzh_emblem));
+        emblem.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int emblemSize = UiKit.dp(this, 72);
+        LinearLayout.LayoutParams emblemLp = new LinearLayout.LayoutParams(emblemSize, emblemSize);
+        emblemLp.gravity = Gravity.CENTER_HORIZONTAL;
+        emblemLp.topMargin = UiKit.dp(this, 4);
+        hero.addView(emblem, emblemLp);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.home_hero_title);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+            UiKit.dim(this, R.dimen.gzh_text_display));
+        title.setTextColor(UiKit.color(this, R.color.gzh_on_surface));
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = UiKit.dp(this, 12);
+        hero.addView(title, titleLp);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(R.string.home_hero_subtitle);
+        subtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+            UiKit.dim(this, R.dimen.gzh_text_title));
+        subtitle.setTextColor(UiKit.color(this, R.color.gzh_primary));
+        subtitle.setTypeface(Typeface.DEFAULT_BOLD);
+        subtitle.setAllCaps(true);
+        subtitle.setLetterSpacing(0.18f);
+        subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        subtitleLp.topMargin = UiKit.dp(this, 2);
+        subtitleLp.bottomMargin = UiKit.dp(this, 4);
+        hero.addView(subtitle, subtitleLp);
+
+        // The one thing this app exists to do: the same launch path the old Launch Game
+        // button used, landscape probe and all (onLaunchGame()).
+        MaterialButton play = UiKit.button(page, UiKit.BTN_PRIMARY, R.drawable.ic_gzh_play,
+            getString(R.string.home_play), this::onLaunchGame);
+        play.setMinHeight(UiKit.dp(this, 64));
+        play.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f);
+        ((LinearLayout.LayoutParams) play.getLayoutParams()).topMargin =
+            UiKit.dim(this, R.dimen.gzh_card_gap);
+
+        LinearLayout status = UiKit.card(page);
+        homeFilesRow = UiKit.listRow(status, R.drawable.ic_gzh_folder,
+            getString(R.string.settings_cat_files), null, () -> navigateTo(PAGE_FILES));
+        // The first row sits on the card's own padding, like a card's first line does.
+        ((LinearLayout.LayoutParams) homeFilesRow.root.getLayoutParams()).topMargin = 0;
+        homeOnlineRow = UiKit.listRow(status, R.drawable.ic_gzh_account,
+            getString(R.string.home_row_online), null,
+            () -> startActivity(new Intent(this, GeneralsOnlineActivity.class)));
+        homeConfigRow = UiKit.listRow(status, R.drawable.ic_gzh_chip,
+            getString(R.string.settings_cat_game), null, () -> navigateTo(PAGE_GAME));
+
+        refreshHomeStatus();
+    }
+
+    private void refreshHomeStatus() {
+        if (homeFilesRow != null) {
+            // The same verdict the Game files page spells out in full (refreshStatus()):
+            // the archives exist, and their directory tables are intact.
+            String path = getSavedGamePath();
+            int textRes;
+            int colorRes;
+            if (path == null) {
+                textRes = R.string.home_status_files_missing;
+                colorRes = R.color.gzh_status_warn;
+            } else {
+                File dir = new File(path);
+                boolean ready = isValidGameFolder(dir) && findGameFolderIntegrityIssues(dir).isEmpty();
+                textRes = ready ? R.string.home_status_files_ready : R.string.home_status_files_attention;
+                colorRes = ready ? R.color.gzh_status_ok : R.color.gzh_status_error;
+            }
+            homeFilesRow.supporting.setText(textRes);
+            homeFilesRow.supporting.setTextColor(UiKit.color(this, colorRes));
+        }
+        if (homeOnlineRow != null) {
+            String displayName = GeneralsOnlineActivity.getSignedInDisplayName(this);
+            homeOnlineRow.supporting.setText(displayName != null
+                ? getString(R.string.home_status_online_signed_in, displayName)
+                : getString(R.string.home_status_online_signed_out));
+        }
+        if (homeConfigRow != null) {
+            homeConfigRow.supporting.setText(getString(R.string.home_status_config_summary,
+                getString(getSimHz(this) == SIM_HZ_CROSSPLAY
+                    ? R.string.setup_sim_rate_60_short
+                    : R.string.setup_sim_rate_30_short),
+                screenShapeLabel(getScreenShape(this)),
+                shortRenderBackendLabel(getRenderBackendChoice())));
+        }
+    }
+
+    // ------------------------------------------------------------ Settings list
+
+    private void buildSettingsList(LinearLayout page) {
+        LinearLayout list = UiKit.card(page);
+        for (int i = 0; i < SETTINGS_PAGES.length; i++) {
+            final int target = SETTINGS_PAGES[i];
+            UiKit.Row row = UiKit.listRow(list, SETTINGS_ICONS[i], getString(SETTINGS_TITLES[i]),
+                getString(SETTINGS_DESCRIPTIONS[i]), () -> navigateTo(target));
+            if (i == 0) {
+                ((LinearLayout.LayoutParams) row.root.getLayoutParams()).topMargin = 0;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ Game files page
+
+    // GeneralsX @refactor Find N5 fork 28/09/2026 The game folder card that used to sit under
+    // the Launch button on the old Home tab, unchanged, now on a page of its own.
+    private void buildGameFilesSection(LinearLayout page) {
         LinearLayout folder = UiKit.card(page);
         UiKit.sectionHeader(folder, R.drawable.ic_gzh_folder,
             getString(R.string.setup_card_game_folder), false);
@@ -472,13 +809,166 @@ public class SetupActivity extends Activity {
             UiKit.button(folder, UiKit.BTN_DANGER, R.drawable.ic_gzh_broom,
                 getString(R.string.setup_button_clear_base_generals), this::onClearBaseGeneralsFolder);
         }
+    }
 
-        // GeneralsX @bugfix Android port 01/08/2026 kept above the advanced
-        // settings -- signing into GeneralsOnline is a primary action most
-        // people want right after picking their game folder, not something to
-        // bury under settings most players never touch.
-        buildGeneralsOnlineSection(page);
-        buildUpdatesSection(page);
+    // ------------------------------------------------------------ Touch controls page
+
+    // GeneralsX @feature Find N5 fork 28/09/2026 The touch gestures the engine lets a player
+    // tune (see the PREF_TOUCH_* block near the top of this class for how they reach it).
+    // Every change is saved at once; the toast says when it takes effect.
+    private Toast touchSavedToast;
+
+    private void buildTouchControlsSection(LinearLayout page) {
+        // Long press to cancel.
+        LinearLayout longPress = UiKit.card(page);
+        final TextView longPressValue = UiKit.sectionHeader(longPress, R.drawable.ic_gzh_touch,
+            getString(R.string.touch_long_press_title), true);
+        // Tenths of a second on an integer track (3..20, step 1) rather than 0.3..2.0 with a
+        // 0.1 step: Slider rejects a float value that is not an exact multiple of its step,
+        // and 0.1 has no exact float.
+        final int startTenths = getTouchLongPressMs(this) / 100;
+        longPressValue.setText(longPressLabel(startTenths));
+        Slider slider = new Slider(this);
+        slider.setValueFrom(TOUCH_LONG_PRESS_MIN_MS / 100f);
+        slider.setValueTo(TOUCH_LONG_PRESS_MAX_MS / 100f);
+        slider.setStepSize(1f);
+        slider.setValue(startTenths);
+        // The header already spells the value out in seconds; the bubble would show tenths.
+        slider.setLabelBehavior(LabelFormatter.LABEL_GONE);
+        slider.setTrackActiveTintList(UiKit.tint(this, R.color.gzh_primary));
+        slider.setTrackInactiveTintList(UiKit.tint(this, R.color.gzh_surface_container_highest));
+        slider.setThumbTintList(UiKit.tint(this, R.color.gzh_primary));
+        slider.setHaloTintList(UiKit.tint(this, R.color.gzh_ripple_primary));
+        slider.setContentDescription(getString(R.string.touch_long_press_title));
+        slider.addOnChangeListener((s, value, fromUser) -> {
+            int tenths = Math.round(value);
+            longPressValue.setText(longPressLabel(tenths));
+            if (fromUser) {
+                setTouchLongPressMs(this, tenths * 100);
+                if (!touchSliderDragging) {
+                    toastTouchSaved();
+                }
+            }
+        });
+        slider.addOnSliderTouchListener(new Slider.OnSliderTouchListener() {
+            @Override
+            public void onStartTrackingTouch(Slider s) {
+                // Each step is still saved as it happens (above); only the toast waits for
+                // the finger to lift.
+                touchSliderDragging = true;
+            }
+
+            @Override
+            public void onStopTrackingTouch(Slider s) {
+                touchSliderDragging = false;
+                toastTouchSaved();
+            }
+        });
+        LinearLayout.LayoutParams sliderLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sliderLp.topMargin = UiKit.dim(this, R.dimen.gzh_item_gap_tight);
+        longPress.addView(slider, sliderLp);
+        UiKit.helpText(longPress, getString(R.string.touch_long_press_help));
+
+        // Double tap + drag to select.
+        LinearLayout doubleTap = UiKit.card(page);
+        SwitchCompat doubleTapSwitch = UiKit.switchRow(doubleTap,
+            getString(R.string.touch_double_tap_drag_title), getString(R.string.touch_double_tap_drag_desc));
+        removeRowTopGap(doubleTapSwitch);
+        doubleTapSwitch.setChecked(getTouchDoubleTapDrag(this));
+        doubleTapSwitch.setOnCheckedChangeListener((button, checked) -> {
+            setTouchDoubleTapDrag(this, checked);
+            toastTouchSaved();
+        });
+
+        // Smart tap delay.
+        LinearLayout smartTap = UiKit.card(page);
+        SwitchCompat smartTapSwitch = UiKit.switchRow(smartTap,
+            getString(R.string.touch_smart_tap_title), getString(R.string.touch_smart_tap_desc));
+        removeRowTopGap(smartTapSwitch);
+        smartTapSwitch.setChecked(getTouchSmartTapDelay(this));
+        smartTapSwitch.setOnCheckedChangeListener((button, checked) -> {
+            setTouchSmartTapDelay(this, checked);
+            toastTouchSaved();
+        });
+
+        // Cancel button: shown or not, its size, and a way back to its default place.
+        LinearLayout cancel = UiKit.card(page);
+        UiKit.sectionHeader(cancel, R.drawable.ic_gzh_touch,
+            getString(R.string.touch_cancel_button_title), false);
+        SwitchCompat cancelSwitch = UiKit.switchRow(cancel,
+            getString(R.string.touch_cancel_button_switch), getString(R.string.touch_cancel_button_switch_desc));
+        cancelSwitch.setChecked(getTouchCancelButton(this));
+
+        UiKit.caption(cancel, getString(R.string.touch_cancel_button_size));
+        CharSequence[] sizeLabels = new CharSequence[] {
+            getString(R.string.touch_size_small),
+            getString(R.string.touch_size_medium),
+            getString(R.string.touch_size_large)
+        };
+        final com.google.android.material.button.MaterialButtonToggleGroup sizeGroup =
+            UiKit.segmented(cancel, sizeLabels, getTouchCancelButtonSize(this) - 1, index -> {
+                int picked = index + 1;
+                if (picked == getTouchCancelButtonSize(this)) {
+                    return;
+                }
+                setTouchCancelButtonSize(this, picked);
+                toastTouchSaved();
+            });
+        setChildrenEnabled(sizeGroup, cancelSwitch.isChecked());
+        cancelSwitch.setOnCheckedChangeListener((button, checked) -> {
+            setTouchCancelButton(this, checked);
+            setChildrenEnabled(sizeGroup, checked);
+            toastTouchSaved();
+        });
+
+        UiKit.button(cancel, UiKit.BTN_TONAL, R.drawable.ic_gzh_refresh,
+            getString(R.string.touch_reset_position), this::onResetTouchButtonPosition);
+        UiKit.helpText(cancel, getString(R.string.touch_cancel_button_help));
+    }
+
+    // True while a finger is on the long-press slider, so keyboard and accessibility steps
+    // (which never touch it) still get their confirmation toast from onChange.
+    private boolean touchSliderDragging;
+
+    private String longPressLabel(int tenths) {
+        return getString(R.string.touch_long_press_value, tenths / 10f);
+    }
+
+    // A card holding nothing but one switch row: drop the gap switchRow() leaves above
+    // itself for the header it expects to follow.
+    private static void removeRowTopGap(View rowChild) {
+        View row = (View) rowChild.getParent();
+        ((LinearLayout.LayoutParams) row.getLayoutParams()).topMargin = 0;
+    }
+
+    private static void setChildrenEnabled(android.view.ViewGroup group, boolean enabled) {
+        for (int i = 0; i < group.getChildCount(); i++) {
+            group.getChildAt(i).setEnabled(enabled);
+        }
+        // The segment colours are checked/unchecked pairs with no disabled state, so the
+        // group is dimmed as a whole to read as unavailable.
+        group.setAlpha(enabled ? 1f : 0.38f);
+    }
+
+    private void toastTouchSaved() {
+        if (touchSavedToast != null) {
+            touchSavedToast.cancel();
+        }
+        touchSavedToast = Toast.makeText(this, R.string.toast_touch_saved, Toast.LENGTH_SHORT);
+        touchSavedToast.show();
+    }
+
+    // The engine keeps a dragged cancel button's position in TouchButtons.ini in the
+    // user-data folder (beside Options.ini); with no file there it uses its default place.
+    private void onResetTouchButtonPosition() {
+        File dir = DataPackInstaller.userDataDir();
+        File layout = dir != null ? new File(dir, "TouchButtons.ini") : null;
+        if (layout != null && layout.isFile() && !layout.delete()) {
+            toast(getString(R.string.touch_reset_position_failed));
+            return;
+        }
+        toast(getString(R.string.touch_reset_position_done));
     }
 
     // ------------------------------------------------------------ Updates
@@ -1283,11 +1773,11 @@ public class SetupActivity extends Activity {
             return;
         }
         Toast.makeText(this, R.string.setup_toast_render_backend_saved, Toast.LENGTH_LONG).show();
-        // The Custom Vulkan Driver / DXVK Config cards are only relevant for
-        // the Vulkan backend -- rebuilding this one page shows/hides them
-        // immediately, without the full recreate() (and the jump back to
-        // Home) the old dialog needed.
-        showTab(TAB_GRAPHICS);
+        // GeneralsX @refactor Find N5 fork 28/09/2026 Rebuild the page the picker is on: the
+        // segmented row compares each pick against the backend it was built with, so a stale
+        // row would skip saving a switch back to it. The Vulkan-only cards (driver, dxvk.conf)
+        // now live on the Advanced page, which checks the backend each time it is opened.
+        showPage(currentPage);
     }
 
     // GeneralsX @feature Android port 10/07/2026 Optional custom Vulkan
@@ -2064,7 +2554,7 @@ public class SetupActivity extends Activity {
     // line can be scrolled past unnoticed but a dialog can't.
     private void refreshStatus() {
         if (statusText == null) {
-            return;  // the current page has no status line (see showTab())
+            return;  // the current page has no status line (see showPage())
         }
         String path = getSavedGamePath();
         SpannableStringBuilder sb = new SpannableStringBuilder();
@@ -2893,10 +3383,10 @@ public class SetupActivity extends Activity {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_BASE_GENERALS_PATH).apply();
         new File(getFilesDir(), "generals_base_path.txt").delete();
         Toast.makeText(this, R.string.setup_toast_base_generals_cleared, Toast.LENGTH_LONG).show();
-        // Only the Home card changes shape (the "clear" button disappears) --
-        // rebuilding that one page is enough, and keeps the user where they
-        // are instead of restarting the whole Activity.
-        showTab(TAB_HOME);
+        // Only the game folder card changes shape (the "clear" button disappears) --
+        // rebuilding that one page (Game files) is enough, and keeps the user where
+        // they are instead of restarting the whole Activity.
+        showPage(currentPage);
     }
 
     String getBaseGeneralsPath() {
@@ -2994,7 +3484,8 @@ public class SetupActivity extends Activity {
                     saveBaseGeneralsPath(resolved.getAbsolutePath());
                     Toast.makeText(this, getString(R.string.setup_toast_base_generals_saved,
                         resolved.getAbsolutePath()), Toast.LENGTH_LONG).show();
-                    showTab(TAB_HOME);
+                    // Rebuilds the Game files page, which now shows the "clear" button.
+                    showPage(currentPage);
                 }
             }
         } else if (requestCode == REQUEST_IMPORT_DRIVER && resultCode == Activity.RESULT_OK && data != null) {

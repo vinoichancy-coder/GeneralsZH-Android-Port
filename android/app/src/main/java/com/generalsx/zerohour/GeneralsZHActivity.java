@@ -91,6 +91,19 @@ public class GeneralsZHActivity extends SDLActivity {
             args.add("-gxScreenShape");
             args.add(screenShape);
         }
+        // GeneralsX @feature Find N5 fork 28/09/2026 Touch controls from Setup's Touch controls
+        // page. Always passed, defaults included, so the engine never has to guess what the
+        // launcher's defaults are.
+        args.add("-gxLongPressMs");
+        args.add(String.valueOf(SetupActivity.getTouchLongPressMs(this)));
+        args.add("-gxDoubleTapDrag");
+        args.add(SetupActivity.getTouchDoubleTapDrag(this) ? "1" : "0");
+        args.add("-gxSmartTap");
+        args.add(SetupActivity.getTouchSmartTapDelay(this) ? "1" : "0");
+        args.add("-gxCancelButton");
+        args.add(SetupActivity.getTouchCancelButton(this) ? "1" : "0");
+        args.add("-gxCancelButtonSize");
+        args.add(String.valueOf(SetupActivity.getTouchCancelButtonSize(this)));
         Intent intent = getIntent();
         String replay = intent != null ? intent.getStringExtra(EXTRA_REPLAY) : null;
         if (replay == null || replay.isEmpty()) {

@@ -95,6 +95,14 @@ namespace TouchInput
 	*/
 	void tap(Int x, Int y);
 
+	/// GeneralsX @feature Find N5 fork 28/09/2026 Would tap() here issue an order, rather than
+	/// select, clear the selection or do nothing? Walks tap()'s own decisions with no side
+	/// effects -- the only engine question it asks is evaluateContextCommand in EVALUATE_ONLY
+	/// mode. The smart tap delay holds exactly these taps back for the double-tap window, so
+	/// the first tap of a double tap or a double-tap-drag never sends units anywhere, while a
+	/// tap that selects stays instant.
+	Bool tapIssuesOrder(Int x, Int y);
+
 	/// Second tap in the same spot: select every unit of that type on screen.
 	void doubleTap(Int x, Int y);
 

@@ -30,6 +30,7 @@
 #include "Common/GXReplayCheck.h"
 #include "Common/GXSafeArea.h"
 #include "Common/GXScreenShape.h"
+#include "Common/GXTouchSettings.h"
 #include "Common/CRCDebug.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/Recorder.h"
@@ -466,6 +467,58 @@ Int parseGxScreenShape(char *args[], int num)
 	if (num > 1)
 	{
 		GXScreenShape::set(args[1]);
+		return 2;
+	}
+	return 1;
+}
+
+// GeneralsX @feature Find N5 fork 28/09/2026 Touch controls from the launcher's Touch controls
+// page; see Common/GXTouchSettings.h. Each takes one value and, without it, changes nothing.
+Int parseGxLongPressMs(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXTouchSettings::setLongPressMs(atoi(args[1]));
+		return 2;
+	}
+	return 1;
+}
+
+Int parseGxDoubleTapDrag(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXTouchSettings::setDoubleTapDrag(atoi(args[1]) != 0);
+		return 2;
+	}
+	return 1;
+}
+
+Int parseGxSmartTap(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXTouchSettings::setSmartTap(atoi(args[1]) != 0);
+		return 2;
+	}
+	return 1;
+}
+
+Int parseGxCancelButton(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXTouchSettings::setCancelButton(atoi(args[1]) != 0);
+		return 2;
+	}
+	return 1;
+}
+
+Int parseGxCancelButtonSize(char *args[], int num)
+{
+	if (num > 1)
+	{
+		GXTouchSettings::setCancelButtonSize(atoi(args[1]));
 		return 2;
 	}
 	return 1;
@@ -1222,6 +1275,11 @@ static CommandLineParam paramsForStartup[] =
 	{ "-gxCrcEveryFrame", parseGxCrcEveryFrame },
 	{ "-gxSafeInsets", parseGxSafeInsets },
 	{ "-gxScreenShape", parseGxScreenShape },
+	{ "-gxLongPressMs", parseGxLongPressMs },
+	{ "-gxDoubleTapDrag", parseGxDoubleTapDrag },
+	{ "-gxSmartTap", parseGxSmartTap },
+	{ "-gxCancelButton", parseGxCancelButton },
+	{ "-gxCancelButtonSize", parseGxCancelButtonSize },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded

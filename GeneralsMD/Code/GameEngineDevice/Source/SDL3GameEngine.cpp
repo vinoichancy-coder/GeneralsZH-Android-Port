@@ -68,6 +68,7 @@
 #include "Common/GameAudio.h"
 #include "GameLogic/GameLogic.h"
 #include "SDL3Device/GameClient/TouchInput.h"
+#include "Common/GXTouchSettings.h"
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
@@ -261,6 +262,12 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 //   2 fingers tapped together, both staying near where they landed ->
 //                                          right-click (fast "cancel selection")
 //
+// GeneralsX @refactor Find N5 fork 28/09/2026 The list above is the original design and
+// several entries have since changed: a still long press now cancels natively
+// (TouchInput::cancelOrDeselect) after a player-set time, press-hold-drag and
+// tap-then-drag both draw a selection box, and an on-screen cancel button has its own
+// phase. docs/port/TOUCH_CONTROLS.md and the README's gesture table are current.
+//
 // GeneralsX @bugfix Android port 01/08/2026, again Movement now ALWAYS wins
 // over hold-duration, no matter when it happens. The previous cut fired the
 // long-press right-click proactively the instant LONG_PRESS_MS elapsed
@@ -337,6 +344,11 @@ struct TouchState {
 		LIST_SCROLL, // finger1 landed on a list box and dragged past the dead zone -- the list
 		             // follows the finger (GadgetListBoxTouchScroll*), nothing is sent to the
 		             // window manager, and the release selects nothing.
+		CANCEL_BUTTON, // GeneralsX @feature Find N5 fork 28/09/2026 finger1 landed on the
+		             // on-screen cancel button (GXTouchSettings, drawn by InGameUI). A release
+		             // cancels; a drag past the dead zone moves the button instead, and the
+		             // release then saves where it was put. Nothing reaches the engine's
+		             // input path either way.
 		UI_PRESS     // finger1 landed directly on a GameWindow (button, panel, etc.) --
 		             // LEFT_BUTTON_DOWN already sent immediately at touch-down, motion is
 		             // ignored entirely (frozen at the anchor) until release/cancel sends
@@ -393,6 +405,22 @@ struct TouchState {
 	bool   hasLastTap = false;
 	Uint64 lastTapTicks = 0;
 	float  lastTapX = 0.0f, lastTapY = 0.0f;
+
+	// GeneralsX @feature Find N5 fork 28/09/2026 This PENDING touch landed where and when the
+	// second tap of a double tap would -- fixed at touch-down, because by the time the finger
+	// has dragged, "is it near the last tap" is no longer a question about where it landed.
+	bool   secondTap = false;
+
+	// GeneralsX @feature Find N5 fork 28/09/2026 Smart tap delay: a tap that would issue an
+	// order, held back for the double-tap window (see flushDeferredTap).
+	bool   hasDeferredTap = false;
+	Uint64 deferredTapTicks = 0;
+	float  deferredTapX = 0.0f, deferredTapY = 0.0f;
+
+	// CANCEL_BUTTON: TRUE once the finger has dragged the button, and where on the button it was
+	// grabbed, so the button does not jump to centre itself under the finger.
+	bool   cancelDragging = false;
+	float  cancelGrabDX = 0.0f, cancelGrabDY = 0.0f;
 };
 
 TouchState s_touch;
@@ -420,6 +448,37 @@ const float TAP_DEAD_ZONE_PX = 16.0f;
 // (two separate taps land less precisely than one continuous drag).
 const Uint64 DOUBLE_TAP_MS = 350;
 const float DOUBLE_TAP_DIST_PX = 40.0f;
+
+// GeneralsX @feature Find N5 fork 28/09/2026 The cancel button moves only once the finger has
+// travelled this far on it -- further than TAP_DEAD_ZONE_PX, because a press on a button is a
+// tap far more often than a drag, and a tap that nudged the button would lose the cancel.
+const float CANCEL_BUTTON_DRAG_PX = 24.0f;
+
+// GeneralsX @feature Find N5 fork 28/09/2026 Smart tap delay. A tap that would ORDER something
+// (tapIssuesOrder) is held back for the double-tap window; any tap that only selects, or
+// clears the selection, stays instant. Whatever comes next settles it:
+//   - nothing within the window  -> the order is sent (from applyPendingCameraMotion)
+//   - a second touch there that drags -> it becomes a selection box and the order is DROPPED:
+//     that is the whole point, the player was starting a double-tap-drag, not ordering
+//   - anything else -> the order is sent first, then the new gesture runs, so the relative
+//     order of the two is exactly what it was without the delay
+void flushDeferredTap()
+{
+	if (!s_touch.hasDeferredTap) {
+		return;
+	}
+	s_touch.hasDeferredTap = false;
+	GX_TRACE("smart tap: sending deferred order at (%.2f,%.2f)\n", s_touch.deferredTapX, s_touch.deferredTapY);
+	TouchInput::tap((Int)s_touch.deferredTapX, (Int)s_touch.deferredTapY);
+}
+
+void dropDeferredTap()
+{
+	if (s_touch.hasDeferredTap) {
+		GX_TRACE("smart tap: deferred order dropped\n");
+	}
+	s_touch.hasDeferredTap = false;
+}
 
 // Two-finger tap-to-cancel: both fingers must stay within this distance of
 // where they landed for the whole gesture to count as a tap (-> right-click)
@@ -940,6 +999,26 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 	switch (event.type) {
 	case SDL_EVENT_FINGER_DOWN:
 		if (s_touch.phase == TouchState::IDLE || s_touch.phase == TouchState::MOMENTUM) {
+			// GeneralsX @feature Find N5 fork 28/09/2026 The cancel button is drawn over
+			// everything else, so it gets the first look at a touch: what the player sees under
+			// their finger is the button, whatever window lies beneath it.
+			if (GXTouchSettings::cancelButtonShown() &&
+			    GXTouchSettings::cancelButtonHit((Int)px, (Int)py)) {
+				flushDeferredTap();
+				Int bx = 0, by = 0, bsize = 0;
+				GXTouchSettings::cancelButtonRect(bx, by, bsize);
+				s_touch.finger1 = event.tfinger.fingerID;
+				s_touch.phase = TouchState::CANCEL_BUTTON;
+				s_touch.downX = s_touch.lastX = px;
+				s_touch.downY = s_touch.lastY = py;
+				s_touch.downTicks = SDL_GetTicks();
+				s_touch.cancelDragging = false;
+				s_touch.cancelGrabDX = px - ((float)bx + (float)bsize * 0.5f);
+				s_touch.cancelGrabDY = py - ((float)by + (float)bsize * 0.5f);
+				GXTouchSettings::setCancelButtonPressed(TRUE);
+				break;
+			}
+
 			// GeneralsX @bugfix Android port 03/08/2026 A finger landing
 			// directly on a GUI window (button, panel, etc.) skips the whole
 			// PENDING classification below and gets a REAL, immediate
@@ -964,6 +1043,7 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 				? TheWindowManager->getWindowUnderCursor((Int)px, (Int)py)
 				: nullptr;
 			if (isRealUiHit(uiHit)) {
+				flushDeferredTap();
 				s_touch.finger1 = event.tfinger.fingerID;
 				s_touch.phase = TouchState::UI_PRESS;
 				s_touch.downX = s_touch.lastX = px;
@@ -1007,6 +1087,7 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 			// to a widget goes down the PENDING path instead, whose release asks the
 			// manager first and stops there when the manager takes the input.
 			if (TheInGameUI && TheInGameUI->getGUICommand() != nullptr && !touchPointBelongsToUi(px, py)) {
+				flushDeferredTap();
 				s_touch.finger1 = event.tfinger.fingerID;
 				s_touch.phase = TouchState::TARGETING;
 				s_touch.downX = s_touch.lastX = px;
@@ -1030,6 +1111,19 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 			s_touch.downY = s_touch.lastY = py;
 			s_touch.downTicks = SDL_GetTicks();
 			s_touch.listBox = listBoxAt(px, py);
+
+			// GeneralsX @feature Find N5 fork 28/09/2026 Could this be the second touch of a
+			// double tap (or a double-tap-drag)? Same window and distance the release uses for
+			// isDoubleTap below. If not, a held-back order has nothing left to wait for.
+			{
+				const float fromLastTap = SDL_fabsf(px - s_touch.lastTapX) + SDL_fabsf(py - s_touch.lastTapY);
+				s_touch.secondTap = s_touch.hasLastTap &&
+				                    (s_touch.downTicks - s_touch.lastTapTicks) <= DOUBLE_TAP_MS &&
+				                    fromLastTap <= DOUBLE_TAP_DIST_PX;
+			}
+			if (!s_touch.secondTap) {
+				flushDeferredTap();
+			}
 			// Move the cursor to the touch point NOW (motion clicks nothing, so the
 			// deferred-tap protection is intact). This lets the GUI process hover
 			// over the next frame(s) before the tap commits — hover-driven widgets
@@ -1066,6 +1160,7 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 			// immediately, no classification -- see the file-header comment
 			// for why. A finger landing mid-PANNING (drag-then-pinch without
 			// lifting first) picks it up the same way.
+			flushDeferredTap();
 			s_touch.finger2 = event.tfinger.fingerID;
 			s_touch.f1px = s_touch.lastX;  // finger1's current pixel pos
 			s_touch.f1py = s_touch.lastY;
@@ -1137,6 +1232,19 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 		if (s_touch.phase == TouchState::PENDING && event.tfinger.fingerID == s_touch.finger1) {
 			const float moved = SDL_fabsf(px - s_touch.downX) + SDL_fabsf(py - s_touch.downY);
 			if (moved >= TAP_DEAD_ZONE_PX) {
+				// GeneralsX @feature Find N5 fork 28/09/2026 Tap, then touch the same spot again
+				// and drag: a selection box straight away, without the SELECT_HOLD_MS wait. The
+				// second touch is what makes it unambiguous -- an ordinary drag starts with one.
+				const bool doubleTapDrag = s_touch.secondTap && GXTouchSettings::doubleTapDrag() &&
+				                           s_touch.listBox == nullptr &&
+				                           !(TheInGameUI && TheInGameUI->getPendingPlaceType());
+				if (doubleTapDrag) {
+					dropDeferredTap();
+					s_touch.hasLastTap = false;
+				} else {
+					flushDeferredTap();
+				}
+
 				// GeneralsX @feature Android port 27/09/2026 A drag that started on a list
 				// scrolls the list, not the camera. Re-hit-tested at the press point rather than
 				// trusting the pointer taken at touch-down: a screen change in between destroys
@@ -1167,7 +1275,7 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 					// next motion event.
 					pushMousePosition(px, py);
 					s_touch.phase = TouchState::PLACING;
-				} else if ((SDL_GetTicks() - s_touch.downTicks) >= SELECT_HOLD_MS) {
+				} else if (doubleTapDrag || (SDL_GetTicks() - s_touch.downTicks) >= SELECT_HOLD_MS) {
 					// GeneralsX @feature Android port 02/08/2026 Area selection:
 					// held past SELECT_HOLD_MS WITHOUT crossing the dead zone,
 					// then dragged -- draw a selection box instead of panning.
@@ -1223,6 +1331,17 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 				GadgetListBoxTouchScrollMove(s_touch.listBox, (Int)py);
 			}
 		}
+		else if (s_touch.phase == TouchState::CANCEL_BUTTON && event.tfinger.fingerID == s_touch.finger1) {
+			// GeneralsX @feature Find N5 fork 28/09/2026 Drag the button to put it somewhere else.
+			const float moved = SDL_fabsf(px - s_touch.downX) + SDL_fabsf(py - s_touch.downY);
+			if (!s_touch.cancelDragging && moved >= CANCEL_BUTTON_DRAG_PX) {
+				s_touch.cancelDragging = true;
+			}
+			if (s_touch.cancelDragging) {
+				GXTouchSettings::moveCancelButtonTo((Int)(px - s_touch.cancelGrabDX),
+				                                    (Int)(py - s_touch.cancelGrabDY));
+			}
+		}
 		else if (s_touch.phase == TouchState::SELECTING && event.tfinger.fingerID == s_touch.finger1) {
 			// Every motion event feeds SelectionXlat's MSG_RAW_MOUSE_POSITION
 			// case (grows the selection-box hint rectangle) directly -- message
@@ -1274,6 +1393,11 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 			// remains), just not the phase reset to IDLE.
 			bool startedMomentum = false;
 
+			// GeneralsX @feature Find N5 fork 28/09/2026 A held-back order goes out before
+			// whatever this release does, so the two happen in the order they were tapped.
+			// (The one gesture that drops it, a double-tap-drag, already did so on its drag.)
+			flushDeferredTap();
+
 			switch (s_touch.phase) {
 				case TouchState::PENDING:
 					// A CANCELED touch (incoming call, notification shade, palm
@@ -1304,7 +1428,9 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 					// landed on UI the window manager owns. Dwelling on a dialog is not a
 					// battlefield gesture, and cancelOrDeselect() there would throw away the
 					// armed command the player is holding the dialog open to use.
-					if ((SDL_GetTicks() - s_touch.downTicks) >= LONG_PRESS_MS &&
+					// GeneralsX @feature Find N5 fork 28/09/2026 How long "long" is, is the
+					// player's choice now (launcher, Touch controls).
+					if ((SDL_GetTicks() - s_touch.downTicks) >= (Uint64)GXTouchSettings::longPressMs() &&
 					    !(TheInGameUI && TheInGameUI->getPendingPlaceType()) &&
 					    !touchPointBelongsToUi(s_touch.downX, s_touch.downY)) {
 						// Still PENDING at release means it never crossed the pan
@@ -1463,6 +1589,18 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 							pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP, s_touch.downX, s_touch.downY);
 						} else if (isDoubleTap) {
 							TouchInput::doubleTap((Int)s_touch.downX, (Int)s_touch.downY);
+						} else if (GXTouchSettings::smartTap() && GXTouchSettings::doubleTapDrag() &&
+						           TouchInput::tapIssuesOrder((Int)s_touch.downX, (Int)s_touch.downY)) {
+							// GeneralsX @feature Find N5 fork 28/09/2026 Smart tap delay: this
+							// tap would send units somewhere, and it may be the first half of a
+							// double-tap-drag. Hold it for the double-tap window; see
+							// flushDeferredTap for everything that can settle it. Only with
+							// double-tap-drag on: a plain double tap sends the first order
+							// anyway, so without the drag there is nothing to wait for.
+							s_touch.hasDeferredTap = true;
+							s_touch.deferredTapTicks = SDL_GetTicks();
+							s_touch.deferredTapX = s_touch.downX;
+							s_touch.deferredTapY = s_touch.downY;
 						} else {
 							TouchInput::tap((Int)s_touch.downX, (Int)s_touch.downY);
 						}
@@ -1588,7 +1726,7 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 						// deliberate aim cannot be swallowed by this; pressing and waiting is
 						// what "get me out of here" looks like on a touchscreen.
 						const float movedFromDown = SDL_fabsf(px - s_touch.downX) + SDL_fabsf(py - s_touch.downY);
-						if ((SDL_GetTicks() - s_touch.downTicks) >= LONG_PRESS_MS &&
+						if ((SDL_GetTicks() - s_touch.downTicks) >= (Uint64)GXTouchSettings::longPressMs() &&
 						    movedFromDown < TAP_DEAD_ZONE_PX) {
 							TouchInput::cancelOrDeselect();
 						} else {
@@ -1627,6 +1765,20 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 					// The drag was a scroll: nothing to select, nothing to click.
 					GadgetListBoxTouchScrollEnd();
 					s_touch.listBox = nullptr;
+					break;
+				case TouchState::CANCEL_BUTTON:
+					// GeneralsX @feature Find N5 fork 28/09/2026 A tap on the button backs out of
+					// the armed ability or the pending building, else clears the selection -- the
+					// same cancel the long press and the two-finger tap give. A drag moved it, and
+					// only saves where it was put. A CANCELED touch does neither action but still
+					// keeps a move already made, since the button is already drawn there.
+					GXTouchSettings::setCancelButtonPressed(FALSE);
+					if (s_touch.cancelDragging) {
+						GXTouchSettings::saveCancelButtonPosition();
+					} else if (event.type != SDL_EVENT_FINGER_CANCELED) {
+						TouchInput::cancelOrDeselect();
+					}
+					s_touch.cancelDragging = false;
 					break;
 				case TouchState::UI_PRESS:
 				{
@@ -1715,6 +1867,7 @@ const char *touchPhaseName(TouchState::Phase phase)
 		case TouchState::SELECTING: return "SELECTING";
 		case TouchState::TARGETING: return "TARGETING";
 		case TouchState::LIST_SCROLL: return "LIST_SCROLL";
+		case TouchState::CANCEL_BUTTON: return "CANCEL_BUTTON";
 		case TouchState::UI_PRESS:  return "UI_PRESS";
 	}
 	return "?";
@@ -1848,6 +2001,11 @@ static void updateTouchTargetFeedback()
 	if (!fingerDown) {
 		return;
 	}
+	// GeneralsX @feature Find N5 fork 28/09/2026 A finger on the cancel button is not pointing
+	// at the battlefield beneath it.
+	if (s_touch.phase == TouchState::CANCEL_BUTTON) {
+		return;
+	}
 	if (TheShell && TheShell->isShellActive()) {
 		return;
 	}
@@ -1887,6 +2045,19 @@ void applyPendingCameraMotion()
 	publishTouchDebug();
 	enforceNoPointerScrollWithoutFinger();
 	updateTouchTargetFeedback();
+
+	// GeneralsX @feature Find N5 fork 28/09/2026 Smart tap delay: no second touch came within
+	// the double-tap window, so the held-back order was just an order -- send it. A second touch
+	// still down (PENDING) is left to settle it; every other phase flushed it on the way in. A
+	// match that ended meanwhile gets nothing: the order was for a battlefield no longer there.
+	if (s_touch.hasDeferredTap) {
+		if (TheShell && TheShell->isShellActive()) {
+			dropDeferredTap();
+		} else if ((s_touch.phase == TouchState::IDLE || s_touch.phase == TouchState::MOMENTUM) &&
+		           (SDL_GetTicks() - s_touch.deferredTapTicks) > DOUBLE_TAP_MS) {
+			flushDeferredTap();
+		}
+	}
 
 	if (s_touch.phase == TouchState::PANNING) {
 		s_touch.panVelX = s_touch.lastX - s_touch.panLastPxX;

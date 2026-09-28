@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark navy-teal backdrop for the real Zero Hour eagle emblem
-     (mipmap-xxxhdpi/ic_launcher_foreground.png, upscaled from the actual
-     GeneralsMD/Code/Main/Generals.ico game icon). -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#0F2530" />
-</shape>
+<!-- GeneralsX @feature Find N5 fork 28/09/2026 Launcher icon background: flat dark olive,
+     with a slightly darker diagonal field across the lower corner for depth without a
+     gradient. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#2A3320"
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+    <path
+        android:fillColor="#243019"
+        android:pathData="M0,108 L0,74 L108,40 L108,108 Z" />
+</vector>

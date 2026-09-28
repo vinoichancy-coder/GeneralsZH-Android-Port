@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The actual Zero Hour eagle emblem, extracted from GeneralsMD/Code/Main/
-     Generals.ico (the real game .exe icon) and upscaled to
-     mipmap-xxxhdpi/ic_launcher_foreground.png. minSdk 28 > 26, so this
-     anydpi-v26 entry is the only launcher icon needed. -->
+<!-- GeneralsX @feature Find N5 fork 28/09/2026 Adaptive launcher icon built from vectors
+     only: original art (drawable/ic_launcher_foreground.xml) on a dark olive field, plus a
+     monochrome layer for themed icons. minSdk 28 > 26, so this anydpi-v26 entry is the only
+     launcher icon needed. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

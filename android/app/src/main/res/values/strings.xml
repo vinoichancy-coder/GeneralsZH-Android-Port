@@ -336,4 +336,53 @@
     <string name="online_network_settings">Network settings (servers, PC compatibility): from %1$s, updated automatically from the project\'s GitHub and signed.</string>
     <string name="online_network_settings_builtin">Network settings (servers, PC compatibility): built into this version; newer ones come automatically from the project\'s GitHub.</string>
     <string name="online_datapacks_chip_update">Update available</string>
+    <!-- GeneralsX @feature Find N5 fork 28/09/2026 Home + Settings navigation, and the
+         Touch controls page. -->
+    <string name="nav_settings">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="home_hero_title" translatable="false">Generals</string>
+    <string name="home_hero_subtitle" translatable="false">Zero Hour</string>
+    <string name="home_play">Play</string>
+    <string name="home_row_online">Online account</string>
+    <string name="home_status_files_ready">Ready to play</string>
+    <string name="home_status_files_attention">Needs attention. Tap to see what is wrong.</string>
+    <string name="home_status_files_missing">No game folder selected yet. Tap to choose one.</string>
+    <string name="home_status_online_signed_in">Signed in as %1$s</string>
+    <string name="home_status_online_signed_out">Not signed in. Tap to sign in.</string>
+    <string name="home_status_config_summary" translatable="false">%1$s · %2$s · %3$s</string>
+    <string name="settings_cat_game">Game &amp; performance</string>
+    <string name="settings_cat_game_desc">Simulation rate, screen shape, renderer</string>
+    <string name="settings_cat_touch">Touch controls</string>
+    <string name="settings_cat_touch_desc">Long press, double tap, cancel button</string>
+    <string name="settings_cat_display">Display &amp; language</string>
+    <string name="settings_cat_display_desc">Launcher and game language, menu text size</string>
+    <string name="settings_cat_files">Game files</string>
+    <string name="settings_cat_files_desc">Game folder and base Generals archives</string>
+    <string name="settings_cat_online">Online</string>
+    <string name="settings_cat_online_desc">GeneralsOnline account and multiplayer</string>
+    <string name="settings_cat_updates">Updates</string>
+    <string name="settings_cat_updates_desc">Engine updates from the project</string>
+    <string name="settings_cat_advanced">Advanced</string>
+    <string name="settings_cat_advanced_desc">Vulkan driver, DXVK, logs and diagnostics</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_cat_about_desc">Version and how this works</string>
+    <string name="touch_long_press_title">Long press to cancel</string>
+    <string name="touch_long_press_value">%1$.1f s</string>
+    <string name="touch_long_press_help">Holding a finger on the map this long cancels the armed ability or building, or clears the selection.</string>
+    <string name="touch_double_tap_drag_title">Double tap + drag to select</string>
+    <string name="touch_double_tap_drag_desc">Tap, then touch again and drag to draw a selection box over units.</string>
+    <string name="touch_smart_tap_title">Smart tap delay</string>
+    <string name="touch_smart_tap_desc">Move and attack orders wait a third of a second, so a tap + drag draws a box instead of sending your units first. Selecting stays instant. Works with double tap + drag.</string>
+    <string name="touch_cancel_button_title">Cancel button</string>
+    <string name="touch_cancel_button_switch">Show the cancel button</string>
+    <string name="touch_cancel_button_switch_desc">An on-screen button that cancels the armed ability or building, or clears the selection.</string>
+    <string name="touch_cancel_button_size">Size</string>
+    <string name="touch_size_small">Small</string>
+    <string name="touch_size_medium">Medium</string>
+    <string name="touch_size_large">Large</string>
+    <string name="touch_reset_position">Reset position</string>
+    <string name="touch_cancel_button_help">Drag the button during a match to move it; it remembers its place.</string>
+    <string name="toast_touch_saved">Saved. Applies the next time you start the game.</string>
+    <string name="touch_reset_position_done">Button position reset. It returns to its default place in the next match.</string>
+    <string name="touch_reset_position_failed">Could not reset the button position. Check that the app has access to all files.</string>
 </resources>

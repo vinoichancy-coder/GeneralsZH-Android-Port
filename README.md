@@ -117,10 +117,12 @@ so a tap on a panel never falls through to the map underneath.
 | Tap a unit you own | Select it. If the engine says your current selection has a *specific* interaction with it (get in, repair), that happens instead |
 | Double-tap | Select every unit of that type on screen |
 | Press and hold, then drag | Selection box |
+| Tap, then touch the same spot again and drag | Selection box, straight away (can be turned off in the launcher's Touch controls) |
 | Drag | Pan the camera (direct, no mouse involved) |
 | Two fingers | Pan and zoom together |
-| Long press on the map (~0.6s, no movement) | Cancel an armed ability or a pending building; otherwise clear the selection |
+| Long press on the map (0.6s by default, set in the launcher; no movement) | Cancel an armed ability or a pending building; otherwise clear the selection |
 | Two-finger tap | The same cancel |
+| Tap the on-screen ✕ button | The same cancel. Drag the button to move it; the launcher sets its size, turns it off, or resets its position |
 | Tap a UI button | Press it |
 | Hold a UI button | Read its description, without pressing it |
 | **With an ability armed**: touch the map, drag, release | Aim it — the radius circle follows your finger; release fires it where you let go; a second finger cancels |

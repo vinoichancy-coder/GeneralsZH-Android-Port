@@ -127,12 +127,30 @@ final class UiKit {
     static TextView appBar(ViewGroup parent, CharSequence overline, CharSequence title,
                            int trailingIconRes, CharSequence trailingDescription,
                            Runnable trailingAction) {
+        return appBar(parent, 0, null, null, overline, title,
+            trailingIconRes, trailingDescription, trailingAction);
+    }
+
+    // GeneralsX @feature Find N5 fork 28/09/2026 Same app bar with an optional icon button on
+    // the start edge, which the launcher's settings sub-pages use as their back affordance.
+    static TextView appBar(ViewGroup parent, int leadingIconRes, CharSequence leadingDescription,
+                           Runnable leadingAction, CharSequence overline, CharSequence title,
+                           int trailingIconRes, CharSequence trailingDescription,
+                           Runnable trailingAction) {
         Context c = parent.getContext();
         LinearLayout bar = new LinearLayout(c);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         int gutter = dim(c, R.dimen.gzh_gutter);
         bar.setPadding(gutter, dp(c, 14), gutter, dp(c, 10));
+
+        if (leadingIconRes != 0 && leadingAction != null) {
+            View leading = iconButton(c, leadingIconRes, leadingDescription, leadingAction);
+            LinearLayout.LayoutParams llp = (LinearLayout.LayoutParams) leading.getLayoutParams();
+            llp.setMarginStart(0);
+            llp.setMarginEnd(dim(c, R.dimen.gzh_item_gap));
+            bar.addView(leading, llp);
+        }
 
         LinearLayout text = new LinearLayout(c);
         text.setOrientation(LinearLayout.VERTICAL);

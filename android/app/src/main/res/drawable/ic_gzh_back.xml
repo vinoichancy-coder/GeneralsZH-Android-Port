@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- GeneralsX @feature Android port launcher-ui-2026 08/09/2026 -->
-<!-- GeneralsX @bugfix Find N5 fork 28/09/2026 autoMirrored: a list row's "open" chevron
-     points toward the end edge, which is the left in Arabic and Farsi. -->
+<!-- GeneralsX @feature Find N5 fork 28/09/2026 Back arrow for the settings sub-page app
+     bar. autoMirrored, so it points the way "back" goes in right-to-left locales too. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -11,5 +10,5 @@
     <path
         android:fillColor="#FFFFFFFF"
         android:fillType="nonZero"
-        android:pathData="M9.2 4.4 L17 12 L9.2 19.6 L7.3 17.8 L13.2 12 L7.3 6.2 Z" />
+        android:pathData="M20 10.8 V13.2 H8.6 L13.6 18.2 L11.9 19.9 L4 12 L11.9 4.1 L13.6 5.8 L8.6 10.8 Z" />
 </vector>

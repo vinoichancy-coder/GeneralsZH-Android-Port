@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GeneralsX @feature Find N5 fork 28/09/2026 The launcher icon's star, ring and chevron
+     for the Home hero card. Same geometry as ic_launcher_foreground.xml, with the viewport
+     cropped to the ring (24..84) so the art fills the view instead of floating in the
+     adaptive icon's 108-unit canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="-24"
+        android:translateY="-24">
+        <!-- Ring: an annulus (outer radius 29.25, inner 26.75) around the centre, filled
+             even-odd so it needs no stroke and survives any tint. -->
+        <path
+            android:fillColor="#E2B64A"
+            android:fillType="evenOdd"
+            android:pathData="M54,24.75 A29.25,29.25 0 1,1 54,83.25 A29.25,29.25 0 1,1 54,24.75 Z M54,27.25 A26.75,26.75 0 1,1 54,80.75 A26.75,26.75 0 1,1 54,27.25 Z" />
+        <!-- Five-pointed star, top point up: outer radius 18, inner radius 7.2, centred on
+             (54, 49) so the star and the chevron below it sit optically centred together. -->
+        <path
+            android:fillColor="#E2B64A"
+            android:pathData="M54,31 L58.23,43.18 L71.12,43.44 L60.85,51.22 L64.58,63.56 L54,56.2 L43.42,63.56 L47.15,51.22 L36.88,43.44 L49.77,43.18 Z" />
+        <!-- Rank chevron under the star. -->
+        <path
+            android:fillColor="#E2B64A"
+            android:pathData="M44,67.5 L54,73 L64,67.5 L64,70.9 L54,76.4 L44,70.9 Z" />
+    </group>
+</vector>

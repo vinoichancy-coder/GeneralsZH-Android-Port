@@ -30,6 +30,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GXSafeArea.h"
+#include "Common/GXTouchSettings.h"
 #include <stdio.h>
 
 #define DEFINE_SHADOW_NAMES
@@ -4225,6 +4226,58 @@ void InGameUI::postWindowDraw()
 	{
 		drawPlayerInfoList();
 	}
+
+#if defined(__ANDROID__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+	// GeneralsX @feature Find N5 fork 28/09/2026 After the windows, so the button sits on top of
+	// the command bar and any dialog -- which is also why the gesture layer tests it first.
+	if (GXTouchSettings::cancelButtonShown())
+	{
+		const Bool hasSomethingToCancel =
+			getSelectCount() > 0 || m_pendingGUICommand != nullptr || getPendingPlaceType() != nullptr;
+		drawTouchCancelButton(hasSomethingToCancel);
+	}
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+// GeneralsX @feature Find N5 fork 28/09/2026 The on-screen cancel button: a dark square with a
+// gold frame and a gold X, in the launcher's colours. Faded when there is nothing to cancel, so it
+// stays findable without competing with the battlefield; gold-filled while a finger is on it.
+// Built from lines and rectangles rather than an image so it needs nothing from the game data,
+// which differs between installs.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::drawTouchCancelButton( Bool active ) const
+{
+	if( TheDisplay == nullptr )
+		return;
+
+	Int x, y, size;
+	GXTouchSettings::cancelButtonRect( x, y, size );
+	if( size <= 0 )
+		return;
+
+	const Bool pressed = GXTouchSettings::cancelButtonPressed();
+	const UnsignedByte alpha = (UnsignedByte)( pressed ? 255 : (active ? 215 : 110) );
+	const UnsignedByte darkAlpha = (UnsignedByte)( pressed ? 255 : (active ? 185 : 95) );
+
+	const Color gold			= GameMakeColor( 212, 175,  55, alpha );
+	const Color goldDim		= GameMakeColor( 212, 175,  55, (UnsignedByte)( alpha / 2 ) );
+	const Color dark			= GameMakeColor(  16,  18,  14, darkAlpha );
+	const Color fill			= pressed ? gold : dark;
+	const Color cross			= pressed ? GameMakeColor( 16, 18, 14, 255 ) : gold;
+
+	const Real border = (Real)( size / 22 > 2 ? size / 22 : 2 );
+	const Int inset = size / 9;
+
+	TheDisplay->drawFillRect( x, y, size, size, fill );
+	TheDisplay->drawOpenRect( x, y, size, size, border, gold );
+	// A thin inner frame: the double border of a military stencil plate.
+	TheDisplay->drawOpenRect( x + inset / 2, y + inset / 2, size - inset, size - inset, 1.0f, goldDim );
+
+	const Int pad = size * 3 / 10;
+	const Real stroke = (Real)( size / 12 > 3 ? size / 12 : 3 );
+	TheDisplay->drawLine( x + pad, y + pad, x + size - pad, y + size - pad, stroke, cross );
+	TheDisplay->drawLine( x + size - pad, y + pad, x + pad, y + size - pad, stroke, cross );
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -1025,6 +1025,10 @@ protected:
 	const Image *findTouchOrderImage( TouchOrderMarker marker ) const;
 	void drawTouchOrderMarker( TouchOrderMarker marker, Int x, Int y ) const;
 
+	// GeneralsX @feature Find N5 fork 28/09/2026 The on-screen cancel button (Common/GXTouchSettings.h),
+	// drawn by postWindowDraw(). active: there is a selection, armed command or building to cancel.
+	void drawTouchCancelButton( Bool active ) const;
+
 	// GeneralsX @feature Android port 09/09/2026 See setTouchCommandIcon/setTouchHoverDrawable.
 	// Both are refreshed every frame while a finger is down and expire on their own, so
 	// nothing has to notice the release to clean them up.

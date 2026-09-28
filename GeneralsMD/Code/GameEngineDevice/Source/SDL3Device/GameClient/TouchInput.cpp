@@ -340,6 +340,47 @@ namespace TouchInput
 	}
 
 	//-------------------------------------------------------------------------------------
+	Bool tapIssuesOrder(Int x, Int y)
+	{
+		// GeneralsX @feature Find N5 fork 28/09/2026 Mirrors tap() branch for branch, without
+		// acting. Keep the two in step: a tap this reports as "no order" is executed at once,
+		// so a mismatch could only ever make an order instant again, never swallow one.
+		if (TheInGameUI == nullptr || TheTacticalView == nullptr)
+			return FALSE;
+		if (TheDisplay != nullptr && TheDisplay->isMoviePlaying())
+			return FALSE;
+		if (hasArmedCommand())
+			return FALSE;
+
+		// A force-attack tap is an order onto whatever is under the finger.
+		if (TheInGameUI->isInForceAttackMode())
+			return hasControllableSelection();
+
+		ICoord2D pixel;
+		pixel.x = x;
+		pixel.y = y;
+
+		Coord3D pos;
+		const Bool onTerrain = TheTacticalView->screenToTerrain(&pixel, &pos);
+
+		Drawable *selectable = pickForSelection(pixel);
+		if (selectable != nullptr)
+		{
+			const Object *obj = selectable->getObject();
+			if (obj != nullptr && obj->isLocallyControlled())
+			{
+				const Bool interacts = onTerrain && hasControllableSelection() &&
+															 !selectable->isSelected() &&
+															 selectionInteractsWith(selectable, pos);
+				if (!interacts)
+					return FALSE;
+			}
+		}
+
+		return onTerrain && hasControllableSelection();
+	}
+
+	//-------------------------------------------------------------------------------------
 	void doubleTap(Int x, Int y)
 	{
 		if (skipMovieIfPlaying())
