@@ -211,8 +211,8 @@ jobs:
             ninja-build meson pkg-config glslang-tools ccache
           meson --version
           ninja --version
-          glslangValidator --version | head -1
-          ccache --version | head -1
+          glslangValidator --version | sed -n 1p
+          ccache --version | sed -n 1p
 
       - name: Restore ccache
         id: cache-ccache
@@ -325,10 +325,18 @@ jobs:
         if: env.DUAL_HZ == 'true'
         run: |
           set -euo pipefail
-          TOOLS="$(dirname "$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-nm | head -1)")"
+          TOOLS="$(dirname "$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-nm | sed -n 1p)")"
           LIB="build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so"
           [ -f "$LIB" ] || { echo "::error::60 Hz libmain.so not found at $LIB"; exit 1; }
-          "$TOOLS/llvm-readelf" -h "$LIB" | grep -q AArch64 || { echo "::error::60 Hz libmain.so is not AArch64"; exit 1; }
+          # Capture the header first and match the variable: `readelf | grep -q`
+          # under pipefail fails whenever grep exits on its match before readelf
+          # finishes writing (SIGPIPE, status 141), which is what ended run #1
+          # with "not AArch64" on a correct aarch64 library.
+          ELF_HEADER="$("$TOOLS/llvm-readelf" -h "$LIB")"
+          case "$ELF_HEADER" in
+            *AArch64*) ;;
+            *) echo "::error::60 Hz libmain.so is not AArch64"; echo "$ELF_HEADER"; exit 1 ;;
+          esac
           # Symbol table first (same format as the 30 Hz one below), then strip.
           mkdir -p symbols
           OUT="symbols/libmain60-run${{ github.run_number }}.symbols.txt"
@@ -379,7 +387,7 @@ jobs:
       - name: Verify artifacts
         run: |
           set -euo pipefail
-          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | head -1)"
+          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | sed -n 1p)"
           # GeneralsX @bugfix Android port 13/07/2026 - this step has
           # intermittently failed "libmain.so is not AArch64" (builds #118,
           # #127, #129) within milliseconds of ninja's own "Linking ...
@@ -406,19 +414,28 @@ jobs:
           # to a process started microseconds later. Retry a few times with
           # a short sleep before failing for real; a genuinely wrong-arch
           # binary will still fail every attempt and correctly error out.
+          # GeneralsX @bugfix Android CI 28/09/2026 (Find N5 fork) The likelier
+          # cause of those two failures is the pipe, not the file: under
+          # `set -o pipefail`, `readelf | grep -q` fails with SIGPIPE (141)
+          # whenever grep exits on its match before readelf has finished
+          # writing -- the same check failed run #1 of this fork on a correct
+          # aarch64 library. Capture the header, then match the variable; the
+          # retry loop stays for the I/O-visibility case it was written for.
           READELF_OK=0
           for attempt in 1 2 3 4 5; do
-            if "$READELF" -h "$GAME_LIB" 2>/dev/null | grep -q AArch64; then
-              READELF_OK=1
-              break
-            fi
+            ELF_HEADER="$("$READELF" -h "$GAME_LIB" 2>/dev/null || true)"
+            case "$ELF_HEADER" in
+              *AArch64*) READELF_OK=1; break ;;
+            esac
             sleep 1
           done
           [ "$READELF_OK" = "1" ] || { echo "::error::libmain.so is not AArch64"; exit 1; }
           for lib in libdxvk_d3d8.so libdxvk_d3d9.so; do
             [ -f "build/${{ env.PRESET }}/$lib" ] || { echo "::error::$lib missing"; exit 1; }
           done
-          strings "build/${{ env.PRESET }}/libdxvk_d3d9.so" | grep -q Sdl3WsiDriver || {
+          # Same SIGPIPE hazard as `strings | grep -q` on a multi-MB library;
+          # grep -a searches the binary directly, with no pipe.
+          grep -aq Sdl3WsiDriver "build/${{ env.PRESET }}/libdxvk_d3d9.so" || {
             echo "::error::libdxvk_d3d9.so built without the SDL3 WSI (silent fallback)"; exit 1; }
           echo "Artifacts verified: AArch64 libmain.so + DXVK with SDL3 WSI"
 
@@ -438,11 +455,11 @@ jobs:
       - name: Collect symbol table (before stripping)
         run: |
           set -e
-          TOOLS="$(dirname "$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-nm | head -1)")"
+          TOOLS="$(dirname "$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-nm | sed -n 1p)")"
           LIB="build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so"
           mkdir -p symbols
           OUT="symbols/libmain-run${{ github.run_number }}.symbols.txt"
-          BUILD_ID="$(readelf -n "$LIB" 2>/dev/null | sed -n 's/.*Build ID: \([0-9a-f]*\).*/\1/p' | head -1)"
+          BUILD_ID="$(readelf -n "$LIB" 2>/dev/null | sed -n 's/.*Build ID: \([0-9a-f]*\).*/\1/p' | sed -n 1p)"
           {
             echo "# libmain.so symbols -- run ${{ github.run_number }}, commit ${{ github.sha }}"
             echo "# Match this BuildID against the tombstone's before trusting any address."
@@ -479,7 +496,7 @@ jobs:
       # android/app/build.gradle has the full story).
       - name: Strip debug symbols
         run: |
-          STRIP="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-strip | head -1)"
+          STRIP="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-strip | sed -n 1p)"
           for lib in "build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so" \
                      "build/${{ env.PRESET }}/_deps/sdl3-build/libSDL3.so" \
                      "build/${{ env.PRESET }}/_deps/sdl3_image-build/libSDL3_image.so" \
@@ -544,7 +561,7 @@ jobs:
       - name: Verify APK contains every library libmain.so needs
         run: |
           set -euo pipefail
-          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | head -1)"
+          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | sed -n 1p)"
           APK="${{ steps.locate.outputs.path }}"
           WORKDIR="$(mktemp -d)"
           unzip -q "${APK}" 'lib/arm64-v8a/*' -d "${WORKDIR}"

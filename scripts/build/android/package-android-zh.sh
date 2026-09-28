@@ -38,7 +38,7 @@ DEFAULT_DRIVER_ASSETS="${ANDROID_DIR}/app/src/main/assets/default_driver"
 STAGING="${GX_ANDROID_STAGING:-${HOME}/GeneralsX/android-staging}"
 
 # --- 1. native libraries -----------------------------------------------------
-GAME_LIB="$(find "${BUILD_DIR}" -name libmain.so -not -path "*/_deps/*" 2>/dev/null | head -1)"
+GAME_LIB="$(find "${BUILD_DIR}" -name libmain.so -not -path "*/_deps/*" 2>/dev/null | sed -n 1p)"
 if [[ -z "${GAME_LIB}" ]]; then
     echo "ERROR: libmain.so not found — run ./scripts/build/android/build-android-zh.sh first."
     exit 1
@@ -109,7 +109,7 @@ for entry in "${RUNTIME_LIB_CANDIDATES[@]}"; do
     primary_rel="${entry#*:}"
     src="${BUILD_DIR}/${primary_rel}"
     if [[ ! -f "${src}" ]]; then
-        src="$(find "${BUILD_DIR}" -maxdepth 6 -name "${name}" 2>/dev/null | head -1)"
+        src="$(find "${BUILD_DIR}" -maxdepth 6 -name "${name}" 2>/dev/null | sed -n 1p)"
     fi
     if [[ -z "${src}" || ! -f "${src}" ]]; then
         echo "ERROR: ${name} not found anywhere under ${BUILD_DIR} — libmain.so needs it at dlopen time and the APK will crash on launch without it."
@@ -132,7 +132,7 @@ declare -a ADRENOTOOLS_HOOK_LIBS=(
     "libhook_impl.so"
 )
 for name in "${ADRENOTOOLS_HOOK_LIBS[@]}"; do
-    src="$(find "${BUILD_DIR}" -maxdepth 6 -name "${name}" 2>/dev/null | head -1)"
+    src="$(find "${BUILD_DIR}" -maxdepth 6 -name "${name}" 2>/dev/null | sed -n 1p)"
     if [[ -z "${src}" || ! -f "${src}" ]]; then
         echo "ERROR: ${name} not found anywhere under ${BUILD_DIR} — required by the Custom Vulkan Driver feature (cmake/adrenotools.cmake)."
         exit 1
@@ -145,7 +145,7 @@ if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
     echo "ERROR: ANDROID_NDK_HOME must be set (for libc++_shared.so)."
     exit 1
 fi
-LIBCXX="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so 2>/dev/null | head -1)"
+LIBCXX="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so 2>/dev/null | sed -n 1p)"
 if [[ -z "${LIBCXX}" ]]; then
     echo "ERROR: libc++_shared.so not found in the NDK sysroot."
     exit 1
